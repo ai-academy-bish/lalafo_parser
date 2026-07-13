@@ -1,5 +1,4 @@
 venv/
-foto/
 __pycache__/
 *.json
 *.jsonl
@@ -8,4 +7,7 @@ logs/
 data/
 hf_dataset/
 .ruff_cache/
-house_kg.egg-info/
+*.egg-info/
+# Cloudflare warm-up artefacts (also under data/state, kept explicit)
+cf_session.json
+cf_profile/

@@ -1,9 +1,9 @@
 """Multi-track progress display.
 
-The crawl runs several stages, each with its own rhythm — URL discovery, listing
-pages, photo downloads, entity profiles, dataset shards. A single bar would hide
-all of that, so `ProgressTracker` gives every stage its own colour-coded bar and
-keeps them on screen together.
+The crawl runs several stages, each with its own rhythm — id discovery, detail
+fetching, image downloads, entity derivation, dataset shards.  A single bar would
+hide all of that, so `ProgressTracker` gives every stage its own colour-coded bar
+and keeps them on screen together.
 
 The tracker shares one `Console` with the logger, so a log line printed mid-crawl
 does not tear through a live bar.
@@ -40,12 +40,12 @@ class TrackStyle:
 #: One visual identity per stage, so a glance at the screen tells you which part
 #: of a multi-hour crawl is currently moving.
 STYLES: dict[str, TrackStyle] = {
-    "urls": TrackStyle("cyan", "🔎"),
+    "ids": TrackStyle("cyan", "🔎"),
     "listings": TrackStyle("green", "🏠"),
-    "photos": TrackStyle("magenta", "📷"),
-    "companies": TrackStyle("yellow", "🏢"),
-    "complexes": TrackStyle("blue", "🏗"),
+    "images": TrackStyle("magenta", "📷"),
     "users": TrackStyle("bright_magenta", "👤"),
+    "complexes": TrackStyle("blue", "🏗"),
+    "cities": TrackStyle("yellow", "🏙"),
     "dataset": TrackStyle("bright_green", "📦"),
     "default": TrackStyle("white", "•"),
 }
@@ -102,12 +102,7 @@ class ProgressTracker:
     # -- tracks ------------------------------------------------------------
 
     def track(self, name: str, total: int | None, description: str | None = None) -> None:
-        """Register a stage, or re-purpose an existing one (new total + label).
-
-        A track is reused across phases (URL discovery sizes the streams, then
-        walks their pages), so the description must move with it — otherwise the
-        bar keeps advertising the phase that already finished.
-        """
+        """Register a stage, or re-purpose an existing one (new total + label)."""
         if not self.enabled:
             return
         style = STYLES.get(name, STYLES["default"])

@@ -1,7 +1,7 @@
 [project]
-name = "house-kg"
+name = "lalafo-parser"
 version = "1.0.0"
-description = "Scraper and HuggingFace dataset builder for house.kg (Kyrgyzstan real estate)"
+description = "Scraper and HuggingFace dataset builder for lalafo.kg (Kyrgyzstan real estate)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -11,10 +11,11 @@ classifiers = [
 ]
 
 dependencies = [
-    # scraping
-    "requests>=2.32",
-    "beautifulsoup4>=4.12",
-    "lxml>=5.0",
+    # Cloudflare warm-up: real browser that passes Turnstile
+    "nodriver>=0.38",
+    "opencv-python-headless>=4.9",   # nodriver's verify_cf() Turnstile helper
+    # browserless API client with a Chrome TLS fingerprint
+    "curl_cffi>=0.7",
     # configuration
     "pyyaml>=6.0",
     # logging & progress
@@ -34,14 +35,14 @@ dev = [
 ]
 
 [project.scripts]
-house-kg = "house_kg.cli:main"
+lalafo = "lalafo_parser.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["house_kg*"]
+include = ["lalafo_parser*"]
 
 [tool.ruff]
 line-length = 100

@@ -1,14 +1,17 @@
-"""Persistence: append-only JSONL tables + a photo store.
+"""Persistence: append-only JSONL tables + an image store.
 
-Resumability is the whole point of this module. A full crawl is a multi-hour,
-~26 000-listing, ~46 GB job; it *will* be interrupted. So:
+Resumability is the whole point.  A full real-estate crawl is tens of thousands of
+listings and hundreds of thousands of images; it *will* be interrupted.  So:
 
 * every record is appended to JSONL the moment it is parsed — nothing is held in
-  memory until the end, and a kill -9 loses at most the record in flight;
-* on start-up each table reports the keys it already holds, and the crawler skips
+  memory until the end, and a hard kill loses at most the record in flight;
+* on start-up each table indexes the keys it already holds and the crawler skips
   them, so a restart resumes instead of re-downloading;
-* photos are content-addressed by file existence: a photo already on disk is never
-  fetched twice.
+* discovered ids are their own table, so id-discovery and detail-fetching resume
+  independently.
+
+``JsonlTable`` is unchanged from the house.kg engine — it never knew anything about
+that site.  Only the set of tables and their keys is lalafo-specific.
 """
 
 from __future__ import annotations
@@ -26,10 +29,7 @@ logger = get_logger(__name__)
 
 
 class JsonlTable:
-    """An append-only JSONL file with a de-duplicating key index.
-
-    Thread-safe: the crawler writes from a worker pool.
-    """
+    """An append-only JSONL file with a de-duplicating key index. Thread-safe."""
 
     def __init__(self, path: Path, key: str) -> None:
         self.path = path
@@ -40,7 +40,6 @@ class JsonlTable:
         self._load_keys()
 
     def _load_keys(self) -> None:
-        """Index what a previous run already wrote (this is what makes resume work)."""
         if not self.path.exists():
             return
         recovered = 0
@@ -52,7 +51,6 @@ class JsonlTable:
                 try:
                     row = json.loads(line)
                 except json.JSONDecodeError:
-                    # a partially-written final line from a hard kill: drop it
                     logger.warning("skipping corrupt line in %s", self.path.name)
                     continue
                 value = row.get(self.key)
@@ -75,7 +73,6 @@ class JsonlTable:
         return set(self._keys)
 
     def rows(self) -> Iterator[dict[str, Any]]:
-        """Stream every row back (used by the dataset builder)."""
         if not self.path.exists():
             return
         with self.path.open("r", encoding="utf-8") as fh:
@@ -95,7 +92,6 @@ class JsonlTable:
         if value is None:
             raise ValueError(f"row is missing key field {self.key!r}")
         value = str(value)
-
         with self._lock:
             if value in self._keys:
                 return False
@@ -109,11 +105,11 @@ class JsonlTable:
         return sum(1 for row in rows if self.append(row))
 
 
-class PhotoStore:
+class ImageStore:
     """Flat directory of images named with uuid4.
 
-    Flat on purpose: the dataset ships photos as an embedded HF `Image` feature,
-    so directory structure carries no meaning — the FK in the `photos` table does.
+    Flat on purpose: the dataset ships images as an embedded HF `Image` feature, so
+    directory structure carries no meaning — the FK in the `images` table does.
     """
 
     def __init__(self, directory: Path) -> None:
@@ -127,10 +123,9 @@ class PhotoStore:
         return self.directory / f"{foto_id}{extension}"
 
     def save(self, data: bytes, url: str) -> tuple[str, Path]:
-        """Write bytes under a fresh uuid; returns (foto_id, path)."""
         extension = ".jpg"
         for candidate in (".jpeg", ".png", ".webp", ".jpg"):
-            if url.lower().endswith(candidate):
+            if url.lower().split("?")[0].endswith(candidate):
                 extension = candidate
                 break
         foto_id = self.new_id()
@@ -138,32 +133,31 @@ class PhotoStore:
         path.write_bytes(data)
         return foto_id, path
 
-    def existing(self) -> dict[str, str]:
-        """foto_id -> file name, for everything already on disk."""
-        return {p.stem: p.name for p in self.directory.iterdir() if p.is_file()}
-
     def __len__(self) -> int:
         return sum(1 for p in self.directory.iterdir() if p.is_file())
 
 
 class Storage:
-    """The five tables plus the photo store, wired to the configured paths."""
+    """The five tables + the discovered-ids table + the image store."""
 
-    def __init__(self, raw_dir: Path, photos_dir: Path) -> None:
-        self.listings = JsonlTable(raw_dir / "listings.jsonl", key="house_kg_id")
+    def __init__(self, raw_dir: Path, images_dir: Path) -> None:
+        #: every ad id found in discovery, with its stream classification —
+        #: makes discovery resumable and lets detail-fetching run separately
+        self.discovered = JsonlTable(raw_dir / "discovered.jsonl", key="ad_id")
+
+        self.listings = JsonlTable(raw_dir / "listings.jsonl", key="ad_id")
         self.users = JsonlTable(raw_dir / "users.jsonl", key="user_id")
-        self.companies = JsonlTable(raw_dir / "companies.jsonl", key="slug")
-        self.complexes = JsonlTable(raw_dir / "complexes.jsonl", key="slug")
-        self.reviews = JsonlTable(raw_dir / "reviews.jsonl", key="review_id")
-        self.photos = JsonlTable(raw_dir / "photos.jsonl", key="foto_id")
-        self.photo_store = PhotoStore(photos_dir)
+        self.complexes = JsonlTable(raw_dir / "complexes.jsonl", key="complex_id")
+        self.cities = JsonlTable(raw_dir / "cities.jsonl", key="city_id")
+        self.images = JsonlTable(raw_dir / "images.jsonl", key="foto_id")
+        self.image_store = ImageStore(images_dir)
 
     def summary(self) -> dict[str, int]:
         return {
+            "discovered": len(self.discovered),
             "listings": len(self.listings),
             "users": len(self.users),
-            "companies": len(self.companies),
             "complexes": len(self.complexes),
-            "reviews": len(self.reviews),
-            "photos": len(self.photos),
+            "cities": len(self.cities),
+            "images": len(self.images),
         }
