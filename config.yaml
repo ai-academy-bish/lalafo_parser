@@ -104,9 +104,9 @@ dataset:
   max_shard_size: 500MB
 
   hub:
-    push: false
-    repo_id: your-name/lalafo-kg-realestate
-    private: false
+    push: true
+    repo_id: aiacademy-kg/lalafo-kg-realestate
+    private: true
     token_env: HF_TOKEN
 
 # ---------------------------------------------------------------------------

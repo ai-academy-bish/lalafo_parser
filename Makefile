@@ -47,11 +47,10 @@ help: ## Show this help
 	@printf "  $(YELLOW)%-18s$(RESET) %s\n" "LIMIT"  "stop after N listings (e.g. make parsing_run LIMIT=200)"
 	@printf "  $(YELLOW)%-18s$(RESET) %s\n" "XVFB"   "virtual-display wrapper (empty on a real display)"
 	@printf "\n$(BOLD)Typical flow:$(RESET)\n"
-	@printf "  $(DIM)1.$(RESET) make $(GREEN)setup$(RESET)             $(DIM)# venv + deps$(RESET)\n"
-	@printf "  $(DIM)2.$(RESET) make $(GREEN)browser$(RESET)           $(DIM)# install Chrome + Xvfb (once, server-side)$(RESET)\n"
-	@printf "  $(DIM)3.$(RESET) make $(GREEN)parsing_run$(RESET)       $(DIM)# scrape (resumable — safe to re-run)$(RESET)\n"
-	@printf "  $(DIM)4.$(RESET) make $(GREEN)validate$(RESET)          $(DIM)# check keys, FKs, images$(RESET)\n"
-	@printf "  $(DIM)5.$(RESET) make $(GREEN)make_hf_dataset$(RESET)   $(DIM)# build parquet subsets (+ push)$(RESET)\n\n"
+	@printf "  $(DIM)1.$(RESET) make $(GREEN)setup$(RESET)             $(DIM)# venv + deps + Chrome/Xvfb$(RESET)\n"
+	@printf "  $(DIM)2.$(RESET) make $(GREEN)parsing_run$(RESET)       $(DIM)# scrape (resumable — safe to re-run)$(RESET)\n"
+	@printf "  $(DIM)3.$(RESET) make $(GREEN)validate$(RESET)          $(DIM)# check keys, FKs, images$(RESET)\n"
+	@printf "  $(DIM)4.$(RESET) make $(GREEN)make_hf_dataset$(RESET)   $(DIM)# build parquet subsets (+ push)$(RESET)\n\n"
 
 setup: ## Create the virtualenv (uv) and install dependencies
 	$(call banner,setup)
@@ -62,14 +61,28 @@ setup: ## Create the virtualenv (uv) and install dependencies
 	@uv venv $(VENV)
 	@printf "$(BLUE)▸ installing dependencies$(RESET)\n"
 	@VIRTUAL_ENV=$(VENV) uv pip install -e ".[dev]"
-	@printf "\n$(GREEN)$(BOLD)✓ ready$(RESET) — next: $(CYAN)make browser$(RESET)\n\n"
+	@$(MAKE) --no-print-directory browser
+	@printf "\n$(GREEN)$(BOLD)✓ ready$(RESET) — next: $(CYAN)make parsing_run$(RESET)\n\n"
 
 browser: ## Install Google Chrome + Xvfb (needed for the Cloudflare warm-up)
 	$(call banner,browser + xvfb)
 	@printf "$(DIM)nodriver drives a real Chrome to pass Cloudflare Turnstile.$(RESET)\n"
+	@if command -v google-chrome >/dev/null 2>&1 && command -v xvfb-run >/dev/null 2>&1; then \
+		printf "$(GREEN)✓ google-chrome and xvfb already installed$(RESET)\n"; \
+	else \
+		SUDO=""; [ "$$(id -u)" -ne 0 ] && SUDO="sudo"; \
+		printf "$(BLUE)▸ installing xvfb$(RESET)\n"; \
+		$$SUDO apt-get update && $$SUDO apt-get install -y xvfb || exit 1; \
+		printf "$(BLUE)▸ downloading google-chrome-stable$(RESET)\n"; \
+		deb="$$(mktemp -d)/google-chrome-stable_current_amd64.deb"; \
+		wget -qO "$$deb" https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb || exit 1; \
+		printf "$(BLUE)▸ installing google-chrome-stable$(RESET)\n"; \
+		$$SUDO apt-get install -y "$$deb" || exit 1; \
+		rm -f "$$deb"; \
+	fi
+	@printf "$(BLUE)▸ fetching nodriver's Chrome bits$(RESET)\n"
 	@$(PY) -m nodriver 2>/dev/null || true
-	@command -v google-chrome >/dev/null 2>&1 || printf "$(YELLOW)Install google-chrome-stable and xvfb via your package manager.$(RESET)\n"
-	@printf "$(GREEN)✓ browser check done$(RESET)\n\n"
+	@printf "$(GREEN)✓ browser ready$(RESET)\n\n"
 
 login: ## Authenticate with HuggingFace (hf auth login)
 	$(call banner,huggingface login)
