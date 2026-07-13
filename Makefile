@@ -13,7 +13,7 @@ LIMIT   ?=
 # The crawler warms a Cloudflare cookie with a real browser, so the crawl/warmup
 # targets run under a virtual display. On a desktop with a real display, override
 # with `make parsing_run XVFB=`.
-XVFB    ?= xvfb-run -a --server-args=-screen 0 1366x900x24
+XVFB    ?= xvfb-run -a --server-args="-screen 0 1366x900x24"
 
 # -- colours ----------------------------------------------------------------
 BOLD   := \033[1m
