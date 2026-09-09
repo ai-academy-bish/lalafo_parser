@@ -7,8 +7,22 @@ SHELL := /bin/bash
 
 VENV    := venv
 PY      := $(VENV)/bin/python
-CONFIG  ?= config.yaml
+
+# Which vertical to run. VERTICAL=<name> picks configs/<name>.yaml; CONFIG=<path>
+# overrides it outright. Every config names the taxonomy it crawls, so this one
+# variable is the difference between a real-estate run and a car run.
+VERTICAL ?= realestate
+CONFIG  ?= configs/$(VERTICAL).yaml
 LIMIT   ?=
+
+# `make categories` inputs: ROOT/OUT are required; NAME is the vertical's name and
+# TYPE/DEAL/LABEL stamp the classification axes onto every generated leaf.
+ROOT    ?=
+OUT     ?=
+NAME    ?=
+TYPE    ?=
+DEAL    ?=
+LABEL   ?=
 
 # The crawler warms a Cloudflare cookie with a real browser, so the crawl/warmup
 # targets run under a virtual display. On a desktop with a real display, override
@@ -33,7 +47,7 @@ define banner
 	@printf "$(RESET)\n"
 endef
 
-.PHONY: help setup browser login warmup parsing_run make_hf_dataset validate clean lint test
+.PHONY: help setup browser login warmup parsing_run make_hf_dataset validate categories clean lint test
 
 help: ## Show this help
 	$(call banner,command reference)
@@ -43,12 +57,17 @@ help: ## Show this help
 		| sort \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  $(CYAN)%-18s$(RESET) %s\n", $$1, $$2}'
 	@printf "\n$(BOLD)Variables:$(RESET)\n"
-	@printf "  $(YELLOW)%-18s$(RESET) %s\n" "CONFIG" "path to the YAML config (default: config.yaml)"
+	@printf "  $(YELLOW)%-18s$(RESET) %s\n" "VERTICAL" "which configs/<name>.yaml to run (default: realestate)"
+	@printf "  $(YELLOW)%-18s$(RESET) %s\n" "CONFIG" "explicit config path (overrides VERTICAL)"
 	@printf "  $(YELLOW)%-18s$(RESET) %s\n" "LIMIT"  "stop after N listings (e.g. make parsing_run LIMIT=200)"
 	@printf "  $(YELLOW)%-18s$(RESET) %s\n" "XVFB"   "virtual-display wrapper (empty on a real display)"
+	@printf "\n$(BOLD)Verticals:$(RESET)\n"
+	@for f in configs/*.yaml; do \
+		printf "  $(GREEN)%-18s$(RESET) %s\n" "$$(basename $$f .yaml)" "$$f"; done
 	@printf "\n$(BOLD)Typical flow:$(RESET)\n"
 	@printf "  $(DIM)1.$(RESET) make $(GREEN)setup$(RESET)             $(DIM)# venv + deps + Chrome/Xvfb$(RESET)\n"
 	@printf "  $(DIM)2.$(RESET) make $(GREEN)parsing_run$(RESET)       $(DIM)# scrape (resumable — safe to re-run)$(RESET)\n"
+	@printf "     $(DIM)…or:$(RESET) make $(GREEN)parsing_run$(RESET) $(YELLOW)VERTICAL=cars$(RESET) $(DIM)# same engine, car taxonomy$(RESET)\n"
 	@printf "  $(DIM)3.$(RESET) make $(GREEN)validate$(RESET)          $(DIM)# check keys, FKs, images$(RESET)\n"
 	@printf "  $(DIM)4.$(RESET) make $(GREEN)make_hf_dataset$(RESET)   $(DIM)# build parquet subsets (+ push)$(RESET)\n\n"
 
@@ -94,7 +113,7 @@ warmup: ## Warm/refresh the Cloudflare cookie only (opens a browser)
 	$(call banner,warm cloudflare session)
 	@$(XVFB) $(PY) -m lalafo_parser.cli --config $(CONFIG) warmup
 
-parsing_run: ## Scrape lalafo.kg (resumable; LIMIT=N for a smaller run)
+parsing_run: ## Scrape lalafo.kg (resumable; VERTICAL=cars, LIMIT=N for a smaller run)
 	$(call banner,parsing run)
 	@printf "$(DIM)config: $(CONFIG)$(RESET)\n"
 	@printf "$(DIM)Interrupt safely with Ctrl-C — re-running resumes where it stopped.$(RESET)\n\n"
@@ -109,6 +128,20 @@ make_hf_dataset: ## Build the HuggingFace dataset (and push if configured)
 	$(call banner,build hf dataset)
 	@$(PY) -m lalafo_parser.cli --config $(CONFIG) build
 	@printf "\n$(GREEN)$(BOLD)✓ dataset built$(RESET)\n\n"
+
+categories: ## Generate a taxonomy from the live tree (ROOT=<id> OUT=<path> [NAME= TYPE= DEAL= LABEL=])
+	$(call banner,generate taxonomy)
+	@if [ -z "$(ROOT)" ] || [ -z "$(OUT)" ]; then \
+		printf "$(RED)ROOT and OUT are required$(RESET)\n"; \
+		printf "$(DIM)e.g. make categories ROOT=1625 OUT=configs/categories/moto.yaml \\$(RESET)\n"; \
+		printf "$(DIM)              NAME=moto TYPE=moto DEAL=sale LABEL=subcategory$(RESET)\n\n"; \
+		exit 1; fi
+	@$(XVFB) $(PY) -m lalafo_parser.cli --config $(CONFIG) categories \
+		--root $(ROOT) --out $(OUT) \
+		$(if $(NAME),--vertical $(NAME)) \
+		$(if $(TYPE),--type $(TYPE)) $(if $(DEAL),--deal $(DEAL)) \
+		$(if $(LABEL),--label-key $(LABEL)) $(if $(FORCE),--force)
+	@printf "\n$(GREEN)$(BOLD)✓ written$(RESET) $(OUT) $(DIM)— review type/deal, then point a run config at it$(RESET)\n\n"
 
 lint: ## Run ruff and mypy
 	@$(VENV)/bin/ruff check lalafo_parser

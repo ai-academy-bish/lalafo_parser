@@ -23,9 +23,11 @@ from typing import Any
 class Listing:
     """One ad.  ~40 declared fields + an open-ended ``attrs`` map of characteristics.
 
-    ``to_dict`` flattens ``attrs`` into the row with ``setdefault``, so a
-    characteristic can never clobber a core field — the listings table ends up with
-    more columns than the dataclass declares, exactly as on house.kg.
+    ``to_dict`` flattens ``labels`` and then ``attrs`` into the row with
+    ``setdefault``, so neither can clobber a core field — the listings table ends up
+    with more columns than the dataclass declares, exactly as on house.kg.  Labels
+    go first because they come from the category (authoritative) rather than from a
+    seller-filled attribute.
     """
 
     # identity & provenance
@@ -106,6 +108,10 @@ class Listing:
     foto_ids: list[str] = field(default_factory=list)
     image_count: int = 0
 
+    # extra classification columns contributed by the taxonomy leaf (cars carry
+    # `brand`; real estate carries none) — flattened into the row
+    labels: dict[str, Any] = field(default_factory=dict)
+
     # open-ended characteristics (flattened into the row)
     attrs: dict[str, Any] = field(default_factory=dict)
     #: the untouched param list, for anything the flattening missed
@@ -115,9 +121,11 @@ class Listing:
         row: dict[str, Any] = {
             k: getattr(self, k)
             for k in self.__slots__
-            if k not in ("attrs",)
+            if k not in ("attrs", "labels")
         }
-        # flatten characteristics without ever overwriting a core field
+        # flatten labels, then characteristics, never overwriting a core field
+        for key, value in self.labels.items():
+            row.setdefault(key, value)
         for key, value in self.attrs.items():
             row.setdefault(key, value)
         return row

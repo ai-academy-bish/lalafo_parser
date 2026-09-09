@@ -9,13 +9,15 @@ Users, complexes and cities are extracted from each listing's payload during
 stage 2 (lalafo embeds them), so there is no separate network stage for them — the
 derived counts are computed at dataset-build time.
 
+Which streams get walked comes from ``config.taxonomy`` — the vertical's YAML — so
+this class is identical for real estate, cars or anything else lalafo lists.
+
 Each stage is a method, so a subclass can override one without touching the rest.
 """
 
 from __future__ import annotations
 
 from ..config import Config
-from ..constants import CATEGORIES, categories_for
 from ..http_client import LalafoClient
 from ..logging_utils import ProgressTracker, get_logger
 from ..session import SessionStore
@@ -31,6 +33,7 @@ class Pipeline:
 
     def __init__(self, config: Config) -> None:
         self.config = config
+        self.taxonomy = config.taxonomy
         self.paths = config.paths
         self.storage = Storage(raw_dir=self.paths.raw, images_dir=self.paths.images)
         self.session_store = SessionStore(
@@ -38,6 +41,7 @@ class Pipeline:
             profile_dir=self.paths.state / config.session.profile_dirname,
             max_age=config.session.max_age,
             headless=config.session.headless,
+            warmup_url=self.taxonomy.site_url,
         )
         self.client = LalafoClient(
             self.session_store,
@@ -45,6 +49,7 @@ class Pipeline:
             timeout=config.http.timeout,
             max_retries=config.http.max_retries,
             delay=config.http.delay,
+            referer=self.taxonomy.site_url,
         )
 
     # -- callback shared with the stages -----------------------------------
@@ -57,12 +62,17 @@ class Pipeline:
     def streams(self) -> list[Stream]:
         """The in-scope leaf categories, biggest-lever streams first is not needed —
         discovery is cheap; keep them in a stable id order for readable logs."""
-        wanted = set(categories_for(self.config.scope.property_types,
-                                    self.config.scope.deals))
+        # `or ...` covers a Config built by hand and never resolved; Config.load
+        # always fills these in from the taxonomy.
+        scope = self.config.scope
+        wanted = set(self.taxonomy.categories_for(
+            scope.property_types or list(self.taxonomy.property_types),
+            scope.deals or list(self.taxonomy.deals),
+        ))
         out = []
         for cid in sorted(wanted):
-            pt, deal, name = CATEGORIES[cid]
-            out.append(Stream(cid, pt, deal, name))
+            leaf = self.taxonomy.leaves[cid]
+            out.append(Stream(cid, leaf.property_type, leaf.deal, leaf.name, leaf.labels))
         return out
 
     def warmup(self) -> None:
@@ -90,6 +100,8 @@ class Pipeline:
 
     def run(self) -> dict[str, int]:
         before = self.storage.summary()
+        logger.info("vertical [bold]%s[/] (%s) — %d leaf categories in scope",
+                    self.taxonomy.vertical, self.taxonomy.source.name, len(self.streams()))
         logger.info("storage before: %s", before)
 
         self.warmup()

@@ -7,16 +7,19 @@ file), not a style nit.
 
 from __future__ import annotations
 
-from .constants import DEALS, PROPERTY_TYPES
 from .logging_utils import get_logger
 from .storage import Storage
+from .taxonomy import Taxonomy
 
 logger = get_logger(__name__)
 
 
 class Validator:
-    def __init__(self, storage: Storage) -> None:
+    """Checks the tables against the vertical they were crawled for."""
+
+    def __init__(self, storage: Storage, taxonomy: Taxonomy) -> None:
         self.storage = storage
+        self.taxonomy = taxonomy
         self.failures: list[str] = []
 
     def run(self) -> bool:
@@ -89,14 +92,20 @@ class Validator:
             self._fail(f"{orphan} image rows reference a missing listing")
 
     def _classification(self) -> None:
+        """Every listing must classify inside the vertical it was crawled for."""
+        types = set(self.taxonomy.property_types)
+        deals = set(self.taxonomy.deals)
         bad = 0
         for row in self.storage.listings.rows():
-            if row.get("property_type") not in PROPERTY_TYPES:
+            if row.get("property_type") not in types:
                 bad += 1
-            elif row.get("deal") not in DEALS:
+            elif row.get("deal") not in deals:
                 bad += 1
         if bad:
-            self._fail(f"{bad} listings have an unknown property_type/deal")
+            self._fail(
+                f"{bad} listings have a property_type/deal outside "
+                f"{self.taxonomy.source.name}"
+            )
 
     def _prices(self) -> None:
         # sanity: negotiable ads may have null price; a non-negotiable ad with a

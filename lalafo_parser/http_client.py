@@ -20,7 +20,7 @@ import threading
 import time
 from typing import Any
 
-from .constants import Api
+from .constants import BASE_URL, Api
 from .logging_utils import get_logger
 from .session import SessionStore
 
@@ -35,8 +35,12 @@ class LalafoClient:
     """Fetch JSON and image bytes from the API using the current session."""
 
     def __init__(self, session_store: SessionStore, *, impersonate: str = "chrome131",
-                 timeout: int = 25, max_retries: int = 4, delay: float = 0.0) -> None:
+                 timeout: int = 25, max_retries: int = 4, delay: float = 0.0,
+                 referer: str = BASE_URL) -> None:
         self.session_store = session_store
+        #: The section page the app would have come from — set per vertical from
+        #: ``Taxonomy.site_url``.
+        self.referer = referer
         self.impersonate = impersonate
         self.timeout = timeout
         self.max_retries = max_retries
@@ -57,7 +61,7 @@ class LalafoClient:
         session = self.session_store.load()
         if not session:
             raise ChallengeError("no session available — warm it first")
-        return session["cookies"], Api.headers(session["ua"])
+        return session["cookies"], Api.headers(session["ua"], referer=self.referer)
 
     @staticmethod
     def _is_challenge(text: str) -> bool:

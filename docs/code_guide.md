@@ -31,10 +31,16 @@ stage**; those get the most attention below.
 
 Six rules shaped every decision. If you change the code, keep them.
 
-### 1.1 Constants live in one place
-Every endpoint, header, category id and attribute mapping is in `constants.py`.
-lalafo **will** move an endpoint or rename an attribute; when it does, the fix is one
-file, not a hunt through the crawler.
+### 1.1 Constants live in one place — and site ≠ section
+Everything true of the **site** (endpoints, headers, geography) is in `constants.py`.
+Everything true of one **section** — its leaf categories, its param map, its special
+params — is in a *taxonomy* YAML under `configs/categories/`, loaded by
+`taxonomy.py`. lalafo **will** move an endpoint or restructure a branch; either way
+the fix is one file, not a hunt through the crawler.
+
+The split is what makes the engine section-agnostic: real estate and cars are two
+YAML files over one unchanged pipeline. Adding electronics or jobs is a new file,
+not a new branch of code. See §8.
 
 ### 1.2 Never lose data you cannot re-derive
 An attribute whose param-id is unmapped is **transliterated**, not dropped. The
@@ -70,14 +76,16 @@ The browser (nodriver) is expensive and fragile, so it is used for exactly one t
 
 ```
 lalafo_parser/
-├── constants.py       API contract + categories + param map + geography   ← patch here
-├── config.py          typed configuration (dataclasses ← config.yaml)
+├── constants.py       API contract + geography — what is true of the *site*  ← patch here
+├── taxonomy.py        a vertical: leaf categories, param map, special params ← the YAML
+├── catalog.py         renders a taxonomy file from lalafo's live category tree
+├── config.py          typed configuration (dataclasses ← configs/<vertical>.yaml)
 ├── session.py         Cloudflare warm-up (nodriver) + cf_clearance provider ← the bypass
 ├── http_client.py     curl_cffi client that replays the warmed cookie
 ├── models.py          the dataset records
 ├── storage.py         append-only JSONL tables + image store               ← resume
 ├── validate.py        integrity checks
-├── cli.py             entry points (warmup / crawl / build / validate)
+├── cli.py             entry points (warmup / crawl / build / validate / categories)
 │
 ├── utils/             site-agnostic helpers
 │   ├── text.py        Transliterator, clean_text
@@ -97,6 +105,13 @@ lalafo_parser/
 │   └── card.py        the dataset README
 │
 └── logging_utils/     rich console + file logging, multi-track progress bars
+
+configs/                run configs — one per vertical (how to crawl)
+├── realestate.yaml
+├── cars.yaml
+└── categories/         taxonomies — one per vertical (what to crawl)
+    ├── realestate.yaml
+    └── cars.yaml
 ```
 
 ---
@@ -179,17 +194,45 @@ separate network stage for them — a big saving over house.kg's entity crawl.
 ## 5. Module reference
 
 ### 5.1 `constants.py`
-Pure data. `Api` holds the endpoint templates and the mandatory headers
-(`device: pc`, `country-id: 12`, `language: ru_RU`) — note `feed_url` uses
-**`per-page`** (hyphenated; an underscore is ignored). `CATEGORIES` maps every
-real-estate leaf id to `(property_type, deal, russian_name)` — these are the crawl
-streams. `PARAM_MAP` maps attribute param-ids to English columns, **collapsing
-synonyms** (226 & 3299 are both "Этаж"). `CITY_REGION` is the best-effort oblast
-lookup. Regenerate `CATEGORIES` from `CATEGORY_TREE` when lalafo restructures.
+Pure data, **site-wide only**. `Api` holds the endpoint templates and the mandatory
+headers (`device: pc`, `country-id: 12`, `language: ru_RU`) — note `feed_url` uses
+**`per-page`** (hyphenated; an underscore is ignored). `CITY_REGION` is the
+best-effort oblast lookup (a car ad and a flat ad carry the same `city` string, so
+geography belongs here). `FEED_CAP_THRESHOLD` drives the city partitioning of §6.
+
+### 5.1a `taxonomy.py` — what a vertical *is*
+`Taxonomy.load(path)` reads one YAML and yields the crawl streams. Three blocks:
+
+* `categories` — leaf id → `type` (the `property_type` column), `deal`, `name`, plus
+  any number of free-form **labels**. Real estate declares none; cars declare
+  `brand`, which becomes a `brand` column on every car listing. Labels are flattened
+  into the row ahead of `attrs`, so the category always wins over a same-named param.
+* `params` — param-id → English column, **collapsing synonyms** (226 & 3299 are both
+  "Этаж"). Section-scoped on purpose: lalafo reuses one concept under different ids
+  per branch — mileage is 56 for cars but 2063 for trucks.
+* `special_params` — params that feed a dedicated column or dimension table
+  (`complex` / `developer` / `district`). Omitted where the concept does not exist,
+  so cars never match one and the `complexes` table simply stays empty.
+
+Plus the metadata that identifies the vertical: `vertical`, `title`, `root_category`,
+`site_path` (used as both the Cloudflare warm-up page and the API `Referer`) and the
+optional `guide` — the long-form dataset doc shipped as `DATASET_GUIDE.md`.
+
+`property_types` and `deals` are *derived* from the file, and `ScopeConfig` is
+validated against them — a typo in a run config still fails loudly, just after the
+taxonomy loads rather than at import time.
+
+### 5.1b `catalog.py`
+Fetches `Api.CATEGORY_TREE` and renders a taxonomy skeleton for any root — this is
+`make categories`. It stamps the `type`/`deal` you pass onto every leaf, because the
+axes cannot be inferred from a name; that judgement stays with you.
 
 ### 5.2 `config.py`
-Typed configuration; a typo in the YAML raises at load time. New sections vs
-house.kg: `SessionConfig` (cookie max-age, headless, profile dir) and
+Typed configuration; a typo in the YAML raises at load time. `categories_file` names
+the taxonomy — the one line that separates a real-estate run from a car run.
+`project_root` is found by walking up to `pyproject.toml`, so configs can live in
+`configs/` while `data/`, `logs/` and `hf_dataset/` stay at the repo root. Other
+sections vs house.kg: `SessionConfig` (cookie max-age, headless, profile dir) and
 `MultiprocessingConfig` (processes, threads-per-process, chunk size).
 
 ### 5.3 `session.py` — the bypass
@@ -217,11 +260,17 @@ keys (`ad_id`, `user_id`, `complex_id`, `city_id`, `foto_id`) plus the `discover
 table that makes id-discovery resumable independently of detail-fetching.
 
 ### 5.7 `parsers/listing.py` — the core
-`parse(payload)` turns one detail object into a `ParsedAd` (listing + image refs +
-user + complex + city). `_attributes` is the important method: it flattens `params`
-into named columns via `PARAM_MAP`, transliterates the unmapped ones, keeps the raw
-list, and extracts the complex FK (param 5592's `value_id`), the developer and the
-district. `_classify` reads `property_type`/`deal` from `CATEGORIES`.
+Constructed with the `Taxonomy` for the vertical. `parse(payload)` turns one detail
+object into a `ParsedAd` (listing + image refs + user + complex + city).
+`_attributes` is the important method: it flattens `params` into named columns via
+`taxonomy.param_map`, transliterates the unmapped ones, keeps the raw list, and
+extracts whichever special params the taxonomy declares (the complex FK from param
+5592's `value_id`, the developer, the district). Classification is
+`taxonomy.classify(category_id)` — the leaf carries `property_type`, `deal`, `name`
+and its labels.
+
+Note for §7: workers get the taxonomy's **path**, not the object — `Pool` initargs
+must pickle, and re-reading one small YAML per process is free.
 
 ### 5.8 `crawler/` — see §6 and §7.
 
@@ -243,12 +292,17 @@ a wobbly nested schema.
 «Недвижимость» (2029) reports ~16 k via the feed while the site advertises ~78 k.
 
 So the crawler never queries the parent. It walks **each leaf category separately**
-(`CATEGORIES`), and for a leaf whose `totalCount` exceeds `FEED_CAP_THRESHOLD`
+(the taxonomy's `categories`), and for a leaf whose `totalCount` exceeds `FEED_CAP_THRESHOLD`
 (9 000) with `partition_oversize_by_city` on, it **re-queries the leaf per
 `city_id`** — each city subset fits under the cap, and the union recovers the tail
 the single query hides. Because ~90 % of the board is Bishkek, in practice this means
 "Bishkek, then everything else", and it lifts coverage of the big leaves
 (apartment-sale, apartment-rent) from ~85 % toward completeness.
+
+How much this matters is per vertical. Real estate has several leaves over the cap;
+the car branch has none — its biggest, Toyota, is ~8.8 k — so partitioning almost
+never fires there. Leave it on regardless: it costs one extra feed request per leaf
+when it is not needed.
 
 `IdCollector._walk` pages a (leaf, city) combination in parallel and keeps only ids
 whose `category_id` matches the leaf (the feed injects promoted ads from other
@@ -285,14 +339,32 @@ worker never opens a browser.
 
 **lalafo moved an endpoint / changed headers** → edit `constants.Api`. Nothing else.
 
-**lalafo restructured the categories** → regenerate `CATEGORIES` from
-`Api.CATEGORY_TREE` (fetch it with a warmed session, walk the subtree of
-`REAL_ESTATE_ROOT`, classify leaves). The recon script in the project history shows
-the classifier.
+**lalafo restructured the categories** → regenerate the taxonomy:
+`make categories ROOT=<id> OUT=configs/categories/<vertical>.yaml --force`, then diff
+it against the old file and re-apply your `type`/`deal` split and `params` map.
+
+**Adding a vertical** (the common case now) — no code, two files:
+
+1. `make categories ROOT=<root id> OUT=configs/categories/<name>.yaml NAME=<name>
+   TYPE=<type> DEAL=<deal> [LABEL=<label key>]` — renders every leaf under that root.
+   Find the root id in `Api.CATEGORY_TREE`; the top-level ones are listed in §8 of
+   the dataset guide.
+2. Hand-edit `type`/`deal` where the branch really does split by deal, and fill in
+   `params` for the ids worth clean names (unmapped ones still arrive transliterated,
+   so a first crawl works with `params: {}`).
+3. Copy `configs/cars.yaml` to `configs/<name>.yaml`, point `categories_file` at the
+   new taxonomy, and give it **its own `storage.root`** — two verticals sharing one
+   `data/` would interleave their listings in the same JSONL tables.
+4. `make parsing_run VERTICAL=<name> LIMIT=200` to try it.
+5. When the data is understood, write `docs/<name>_dataset.md` and declare it as
+   `guide:` in the taxonomy. It then ships with that dataset as `DATASET_GUIDE.md`,
+   and the card links to it. A vertical with no `guide:` simply ships none — what it
+   must never do is ship another vertical's.
 
 **A new attribute appeared** → it arrives as a transliterated column automatically.
-To give it a clean name, add one line to `PARAM_MAP`; check first whether it is a
-synonym of an existing concept and, if so, map it to the **same** English field.
+To give it a clean name, add one line to the vertical's `params:` block; check first
+whether it is a synonym of an existing concept and, if so, map it to the **same**
+English field.
 
 **The 403s came back** → the `impersonate` target drifted from the installed Chrome
 major, or Turnstile got harder. Bump `http.impersonate`; confirm nodriver still

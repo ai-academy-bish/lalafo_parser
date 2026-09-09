@@ -16,9 +16,10 @@ from __future__ import annotations
 
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
-from ..constants import CATEGORIES, FEED_CAP_THRESHOLD, Api
+from ..constants import FEED_CAP_THRESHOLD, Api
 from ..http_client import ChallengeError, LalafoClient
 from ..logging_utils import ProgressTracker, get_logger
 from ..storage import Storage
@@ -28,12 +29,15 @@ logger = get_logger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class Stream:
-    """One (leaf category) crawl stream."""
+    """One (leaf category) crawl stream, as the taxonomy defines it."""
 
     category_id: int
     property_type: str
     deal: str
     name: str
+    #: extra classification the leaf carries (cars: ``{"brand": "Toyota"}``).
+    #: Excluded from eq/hash so ``Stream`` stays hashable with a dict field.
+    labels: dict[str, Any] = field(default_factory=dict, compare=False)
 
 
 class IdCollector:
@@ -131,6 +135,7 @@ class IdCollector:
                 "category_id": stream.category_id,
                 "property_type": stream.property_type,
                 "deal": stream.deal,
+                **stream.labels,
             }):
                 new += 1
         logger.info("  %-42s total=%-6d new=%d", stream.name, len(ids), new)

@@ -1,0 +1,136 @@
+# Real-estate taxonomy for lalafo.kg — «Недвижимость» (root 2029).
+#
+# This file *is* the vertical: the crawl streams, the attribute map and the
+# special params. Point a run config at it with `categories_file:`.
+# Regenerate the category list from the live site with `make categories`.
+
+vertical: realestate
+title: "Kyrgyzstan Real Estate"
+root_category: 2029
+site_path: /kyrgyzstan/nedvizhimost
+guide: docs/lalafo_dataset.md
+
+# Params that feed dedicated columns / dimension tables rather than plain
+# attributes. Omit a key when the vertical has no such concept.
+special_params:
+  complex: 5592      # value_id -> complexes table (ЖК)
+  developer: 2665
+  district: 357
+
+# param-id -> English column. Synonyms may share a name and collapse into one
+# column. An unlisted param is NOT dropped — it is transliterated.
+params:
+  68: furniture
+  69: rooms
+  70: area_m2
+  71: land_area_sotka
+  226: floor
+  3299: floor  # synonym of 226
+  228: purpose
+  3284: purpose  # synonym of 228
+  351: kitchen_area_m2
+  354: parking
+  357: district
+  867: series
+  868: legal_documents
+  870: utilities
+  871: heating
+  872: condition
+  873: wall_material
+  874: year_built
+  878: amenities
+  3278: amenities  # synonym of 878
+  2149: offer_type
+  2218: realtor_services
+  2665: developer
+  2666: deal_terms
+  3290: finishing
+  3291: layout
+  3294: completion_date
+  3295: rent_type
+  3296: building_type
+  3509: floors_total
+  5592: complex_name
+
+# Leaf categories = the crawl streams. `type` and `deal` are the two
+# classification axes (columns `property_type` / `deal`); `name` is kept in
+# Russian so a consumer can always reclassify. Any other key becomes an extra
+# label column on the listing.
+categories:
+  2033: {type: house, deal: rent, name: "Долгосрочная аренда домов"}
+  2034: {type: house, deal: daily_rent, name: "Посуточная аренда домов"}
+  2035: {type: house, deal: buy_request, name: "Куплю дом"}
+  2036: {type: house, deal: rent_request, name: "Сниму дом"}
+  2038: {type: land, deal: sale, name: "Продажа участков"}
+  2039: {type: land, deal: rent, name: "Аренда участков"}
+  2041: {type: apartment, deal: rent_request, name: "Сниму квартиру"}
+  2042: {type: apartment, deal: buy_request, name: "Куплю квартиру"}
+  2044: {type: apartment, deal: rent, name: "Долгосрочная аренда квартир"}
+  2045: {type: apartment, deal: daily_rent, name: "Посуточная аренда квартир"}
+  2046: {type: apartment, deal: sale, name: "Продажа квартир"}
+  2048: {type: room, deal: buy_request, name: "Куплю комнату"}
+  2049: {type: room, deal: rent_request, name: "Сниму комнату"}
+  2050: {type: room, deal: sale, name: "Продажа комнат"}
+  2052: {type: room, deal: rent, name: "Долгосрочная аренда комнат"}
+  2053: {type: room, deal: daily_rent, name: "Гостиницы, отели (Посуточная аренда комнат)"}
+  2056: {type: commercial, deal: sale, name: "Продажа офисов"}
+  2057: {type: commercial, deal: sale, name: "Продажа магазинов"}
+  2058: {type: commercial, deal: sale, name: "Продажа ресторанов, кафе"}
+  2059: {type: commercial, deal: sale, name: "Продажа складов и мастерских"}
+  2060: {type: commercial, deal: sale, name: "Продажа отелей и хостелов"}
+  2061: {type: commercial, deal: sale, name: "Продажа зданий"}
+  2062: {type: commercial, deal: sale, name: "Продажа цехов, заводов, фабрик"}
+  2063: {type: commercial, deal: sale, name: "Продажа другой коммерческой недвижимости"}
+  2065: {type: commercial, deal: rent, name: "Аренда складов и мастерских"}
+  2066: {type: commercial, deal: rent, name: "Аренда магазинов"}
+  2067: {type: commercial, deal: rent, name: "Аренда ресторанов и кафе"}
+  2068: {type: commercial, deal: rent, name: "Аренда офисов"}
+  2069: {type: commercial, deal: rent, name: "Аренда помещений под гостиничный бизнес"}
+  2070: {type: commercial, deal: rent, name: "Аренда зданий"}
+  2071: {type: commercial, deal: rent, name: "Аренда цехов, заводов и фабрик"}
+  2072: {type: commercial, deal: rent, name: "Аренда другой коммерческой недвижимости"}
+  4560: {type: newbuild, deal: sale, name: "Новостройки от застройщика"}
+  5294: {type: land, deal: buy_request, name: "Куплю земельный участок"}
+  5298: {type: garage, deal: rent_request, name: "Сниму гараж"}
+  5299: {type: garage, deal: rent, name: "Сдаю в аренду гараж"}
+  5300: {type: garage, deal: buy_request, name: "Куплю гараж"}
+  5301: {type: garage, deal: sale, name: "Продаю гараж"}
+  5302: {type: garage, deal: other, name: "Вагоны"}
+  5303: {type: garage, deal: other, name: "Паркинги"}
+  5314: {type: garage, deal: other, name: "Другое"}
+  6039: {type: commercial, deal: sale, name: "Продажа торговых контейнеров"}
+  6040: {type: commercial, deal: sale, name: "Продажа павильонов"}
+  6041: {type: commercial, deal: sale, name: "Продажа бутиков"}
+  6042: {type: commercial, deal: sale, name: "Продажа киосков, ларьков"}
+  7090: {type: commercial, deal: sale, name: "Продажа автобизнеса"}
+  7091: {type: commercial, deal: sale, name: "Продажа салонов красоты и кабинетов"}
+  7092: {type: commercial, deal: sale, name: "Продажа сельхоз предприятий"}
+  7093: {type: commercial, deal: sale, name: "Продажа медицинских центров"}
+  7248: {type: commercial, deal: rent, name: "Аренда бутиков"}
+  7249: {type: commercial, deal: rent, name: "Аренда павильонов"}
+  8036: {type: commercial, deal: rent, name: "Аренда кабинетов в салонах красоты"}
+  8037: {type: commercial, deal: rent, name: "Аренда медицинских и массажных кабинетов"}
+  8038: {type: commercial, deal: rent, name: "Аренда помещений для автобизнеса"}
+  8039: {type: commercial, deal: rent, name: "Аренда торговых контейнеров"}
+  8040: {type: commercial, deal: rent, name: "Аренда спортивных залов"}
+  8041: {type: commercial, deal: rent, name: "Аренда коворкинга"}
+  8042: {type: commercial, deal: rent, name: "Аренда учебных кабинетов"}
+  8149: {type: commercial, deal: sale, name: "Продажа помещений свободного назначения"}
+  8150: {type: commercial, deal: rent, name: "Аренда помещений свободного назначения"}
+  8151: {type: commercial, deal: rent_request, name: "Сниму коммерческую недвижимость"}
+  12188: {type: house, deal: sale, name: "Продажа барачных домов"}
+  12189: {type: house, deal: sale, name: "Продажа времянки"}
+  12190: {type: house, deal: sale, name: "Продажа таунхаусов"}
+  12191: {type: house, deal: sale, name: "Продажа дачи"}
+  12193: {type: house, deal: sale, name: "Продажа коттеджей и домов"}
+  12194: {type: house, deal: sale, name: "Продажа полдома"}
+  12205: {type: house, deal: sale, name: "Продажа модульных домов"}
+  12666: {type: room, deal: daily_rent, name: "Хостелы"}
+  12743: {type: house, deal: daily_rent, name: "Аренда коттеджей и домов на Иссык-Куле"}
+  12767: {type: apartment, deal: daily_rent, name: "Аренда квартир на Иссык-Куле"}
+  12769: {type: resort, deal: daily_rent, name: "Юрты на Иссык-Куле"}
+  12771: {type: house, deal: daily_rent, name: "Гостевые дома на Иссык-Куле"}
+  12791: {type: resort, deal: daily_rent, name: "Кемпинг на Иссык-Куле"}
+  12792: {type: room, deal: daily_rent, name: "Хостелы и койко-места на Иссык-Куле"}
+  12798: {type: room, deal: daily_rent, name: "Гостиницы на Иссык-Куле"}
+  12885: {type: resort, deal: daily_rent, name: "Детские лагеря на Иссык-Куле"}

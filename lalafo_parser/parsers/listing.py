@@ -9,8 +9,13 @@ nested ``user``.  This module turns one such object into:
 * the residential complex, if any (→ complexes table),
 * the city (→ cities table).
 
-House.kg rule kept: an attribute whose param-id is not in ``PARAM_MAP`` is
-**transliterated**, not dropped, so a new lalafo attribute still reaches the
+The parser is bound to a :class:`~lalafo_parser.taxonomy.Taxonomy`, not to a
+hard-coded category list: it is the taxonomy that says how a leaf classifies, which
+param-ids get clean English names, and which params feed dimension tables.  Point it
+at a different taxonomy and the same parser produces cars instead of flats.
+
+House.kg rule kept: an attribute whose param-id is not in the taxonomy's param map
+is **transliterated**, not dropped, so a new lalafo attribute still reaches the
 dataset under a latinised name and can be promoted to a clean column later.
 """
 
@@ -20,15 +25,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from ..constants import (
-    CATEGORIES,
-    COMPLEX_PARAM_ID,
-    DEVELOPER_PARAM_ID,
-    DISTRICT_PARAM_ID,
-    PARAM_MAP,
-    region_for,
-)
+from ..constants import region_for
 from ..models import Complex, City, Listing, User
+from ..taxonomy import Taxonomy
 from ..utils import Transliterator, clean_text, epoch_to_iso, to_float
 
 
@@ -58,9 +57,14 @@ class ParsedAd:
 
 
 class ListingParser:
-    """Detail JSON -> records. Takes a Transliterator so unmapped params are slugged."""
+    """Detail JSON -> records, for one vertical.
 
-    def __init__(self, translit: Transliterator | None = None) -> None:
+    Takes the :class:`Taxonomy` that defines the vertical and a Transliterator so
+    unmapped params are slugged rather than dropped.
+    """
+
+    def __init__(self, taxonomy: Taxonomy, translit: Transliterator | None = None) -> None:
+        self.taxonomy = taxonomy
         self.translit = translit or Transliterator()
 
     def now(self) -> str:
@@ -73,7 +77,7 @@ class ListingParser:
 
         attrs, params_raw, extracted = self._attributes(node.get("params") or [])
         cat_id = node.get("category_id")
-        ptype, deal, cat_name = self._classify(cat_id)
+        leaf = self.taxonomy.classify(cat_id)
 
         national = node.get("national_price") or {}
 
@@ -82,9 +86,10 @@ class ListingParser:
             url=self._abs_url(node.get("url")),
             pars_date=self.now(),
             category_id=cat_id,
-            property_type=ptype,
-            deal=deal,
-            category_name=cat_name,
+            property_type=leaf.property_type if leaf else None,
+            deal=leaf.deal if leaf else None,
+            category_name=leaf.name if leaf else None,
+            labels=dict(leaf.labels) if leaf else {},
             title=clean_text(node.get("title")),
             description=clean_text(node.get("description")),
             price=to_float(node.get("price")),
@@ -149,12 +154,6 @@ class ListingParser:
 
     # -- pieces ------------------------------------------------------------
 
-    def _classify(self, category_id: Any) -> tuple[str | None, str | None, str | None]:
-        entry = CATEGORIES.get(category_id)
-        if entry:
-            return entry[0], entry[1], entry[2]
-        return None, None, None
-
     def _attributes(
         self, params: list[dict[str, Any]]
     ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
@@ -165,6 +164,10 @@ class ListingParser:
         attrs: dict[str, Any] = {}
         raw: list[dict[str, Any]] = []
         extracted: dict[str, Any] = {}
+        param_map = self.taxonomy.param_map
+        complex_id = self.taxonomy.complex_param
+        developer_id = self.taxonomy.developer_param
+        district_id = self.taxonomy.district_param
 
         for p in params:
             pid = p.get("id")
@@ -173,16 +176,18 @@ class ListingParser:
             value_id = p.get("value_id")
             raw.append({"id": pid, "name": name, "value": value, "value_id": value_id})
 
-            field_name = PARAM_MAP.get(pid) or (self.translit.slugify(name) if name else None)
+            field_name = param_map.get(pid) or (self.translit.slugify(name) if name else None)
             if field_name:
                 attrs.setdefault(field_name, value)
 
-            if pid == COMPLEX_PARAM_ID and value_id:
+            # Special params are optional per vertical: a taxonomy that declares no
+            # `complex` (cars) simply never matches, and the table stays empty.
+            if complex_id is not None and pid == complex_id and value_id:
                 extracted["complex_id"] = value_id
                 extracted["complex_name"] = value
-            elif pid == DEVELOPER_PARAM_ID:
+            elif developer_id is not None and pid == developer_id:
                 extracted["developer"] = value
-            elif pid == DISTRICT_PARAM_ID:
+            elif district_id is not None and pid == district_id:
                 extracted["district"] = value
 
         return attrs, raw, extracted

@@ -30,6 +30,9 @@ from .logging_utils import get_logger
 
 logger = get_logger(__name__)
 
+#: Fallback warm-up page. The pipeline overrides it with the vertical's own
+#: section URL (``Taxonomy.site_url``) so the cookie is harvested on the page the
+#: crawl will actually hit.
 WARMUP_URL = "https://lalafo.kg/kyrgyzstan/nedvizhimost"
 
 
@@ -38,7 +41,7 @@ WARMUP_URL = "https://lalafo.kg/kyrgyzstan/nedvizhimost"
 # ---------------------------------------------------------------------------
 
 def harvest(session_path: Path, profile_dir: Path, headless: bool = False,
-            timeout: int = 90) -> dict:
+            timeout: int = 90, warmup_url: str = WARMUP_URL) -> dict:
     """Pass Turnstile with nodriver and persist ``{cookies, ua}`` atomically.
 
     Must run where a display is available (``xvfb-run`` on a server).  Returns the
@@ -52,7 +55,7 @@ def harvest(session_path: Path, profile_dir: Path, headless: bool = False,
             user_data_dir=str(profile_dir),
             browser_args=["--no-sandbox", "--disable-dev-shm-usage"],
         )
-        tab = await browser.get(WARMUP_URL)
+        tab = await browser.get(warmup_url)
         ok = False
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -102,11 +105,13 @@ class SessionStore:
     """
 
     def __init__(self, session_path: Path, profile_dir: Path,
-                 max_age: int = 1200, headless: bool = False) -> None:
+                 max_age: int = 1200, headless: bool = False,
+                 warmup_url: str = WARMUP_URL) -> None:
         self.session_path = session_path
         self.profile_dir = profile_dir
         self.max_age = max_age
         self.headless = headless
+        self.warmup_url = warmup_url
         self._lock_path = session_path.with_suffix(".lock")
         self._cache: dict | None = None
         self._mtime: float = 0.0
@@ -151,8 +156,10 @@ class SessionStore:
             # another holder may have refreshed while we waited for the lock
             if not force and self.is_fresh():
                 return self.load()  # type: ignore[return-value]
-            logger.info("warming Cloudflare session (this opens a browser)…")
-            return harvest(self.session_path, self.profile_dir, self.headless)
+            logger.info("warming Cloudflare session on %s (this opens a browser)…",
+                        self.warmup_url)
+            return harvest(self.session_path, self.profile_dir, self.headless,
+                           warmup_url=self.warmup_url)
 
     def _harvest_lock(self):
         store = self

@@ -11,3 +11,7 @@ hf_dataset/
 # Cloudflare warm-up artefacts (also under data/state, kept explicit)
 cf_session.json
 cf_profile/
+# extra verticals get their own storage / dataset roots
+data_*/
+hf_dataset_*/
+*_cache/

@@ -1,33 +1,29 @@
-# lalafo.kg real-estate scraper configuration.
+# lalafo.kg — used-car run configuration («Транспорт / Продажа авто»).
 #
-# Every key is optional — omit one and the documented default applies.
-# See lalafo_parser/config.py for the full, typed schema (a typo here fails loudly
-# rather than being silently ignored).
+# Same engine, same tables, same resumability as the real-estate run — the only
+# structural difference is the taxonomy this points at.
+#
+#   make parsing_run VERTICAL=cars LIMIT=200      # try small first
+#
+# The car branch's leaves are *brands*, so `property_types` is just [car] and
+# `deals` is just [sale]; the brand arrives as its own `brand` column, and model /
+# year / mileage / transmission come from the params mapped in the taxonomy file.
+
+# ---------------------------------------------------------------------------
+# Which vertical (leaf categories, attribute map, special params)
+# ---------------------------------------------------------------------------
+categories_file: configs/categories/cars.yaml
 
 # ---------------------------------------------------------------------------
 # What to crawl
 # ---------------------------------------------------------------------------
 scope:
-  # Property types. Comment one out to exclude it.
+  # Omit property_types / deals entirely to crawl every leaf the taxonomy defines
+  # (here: all 125 brands). Listed explicitly for symmetry with the other configs.
   property_types:
-    - apartment
-    - house
-    - room
-    - commercial
-    - land
-    - garage
-    - newbuild
-    - resort
-
-  # Deal kinds. Requests (buy_request / rent_request) are people looking, not
-  # offers — drop them if you only want listings for sale/rent.
+    - car
   deals:
     - sale
-    - rent
-    - daily_rent
-    - buy_request
-    - rent_request
-    - other
 
   # Restrict to certain oblasts (best-effort, by city). All seven by default.
   regions:
@@ -39,22 +35,22 @@ scope:
     - osh
     - batken
 
-  # Stop after N listings. null = crawl everything.
+  # Stop after N listings. null = crawl everything (~55k cars).
   max_listings: null
 
   # Cap feed pages per category stream. null = follow to the last page.
   max_pages_per_stream: null
 
-  # A single feed query is capped (~10k rows); a big leaf is re-queried per city
-  # to recover the tail. Costs extra requests; worth it for a complete crawl.
+  # No car brand exceeds the ~9k feed cap today (the biggest, Toyota, is ~8.8k),
+  # so this rarely fires here — kept on because it costs nothing when unneeded.
   partition_oversize_by_city: true
 
 # ---------------------------------------------------------------------------
 # Cloudflare session (browser warm-up)
 # ---------------------------------------------------------------------------
 session:
-  max_age: 1200          # re-harvest the cf_clearance cookie after this many seconds
-  headless: false        # nodriver passes Turnstile better headed (use xvfb on a server)
+  max_age: 1200
+  headless: false
   profile_dirname: cf_profile
   session_filename: cf_session.json
 
@@ -62,18 +58,18 @@ session:
 # HTTP (browserless client)
 # ---------------------------------------------------------------------------
 http:
-  workers: 10            # threads for id discovery
+  workers: 10
   timeout: 25
   max_retries: 4
   delay: 0.0
-  impersonate: chrome131 # curl_cffi TLS target; match the warmed Chrome major
+  impersonate: chrome131
 
 # ---------------------------------------------------------------------------
 # Multiprocessing (detail-fetch stage)
 # ---------------------------------------------------------------------------
 multiprocessing:
   enabled: true
-  processes: null            # null = os.cpu_count()
+  processes: null
   threads_per_process: 8
   chunk_size: 200
 
@@ -83,30 +79,31 @@ multiprocessing:
 images:
   enabled: true
   workers: 12
-  max_per_listing: null      # null = download all (~8-20 per ad)
+  max_per_listing: null
   prefer_webp: false
 
 # ---------------------------------------------------------------------------
-# Where scraped data lands (relative to this file)
+# Where scraped data lands (relative to the project root)
 # ---------------------------------------------------------------------------
+# Its own root, so a car crawl never mixes with data/ from the real-estate run.
 storage:
-  root: data
+  root: data_cars
   raw_dirname: raw
   photos_dirname: images
-  state_dirname: state       # holds the Cloudflare session + browser profile
+  state_dirname: state
 
 # ---------------------------------------------------------------------------
 # HuggingFace dataset
 # ---------------------------------------------------------------------------
 dataset:
-  output_dir: hf_dataset
+  output_dir: hf_dataset_cars
   include_images: true
   max_shard_size: 500MB
 
   hub:
-    push: true
-    repo_id: aiacademy-kg/lalafo-kg-realestate
-    private: true
+    push: true                          # flip on once you have somewhere to push
+    repo_id: aiacademy-kg/lalafo-kg-cars
+    private: false
     token_env: HF_TOKEN
 
 # ---------------------------------------------------------------------------

@@ -10,6 +10,10 @@ is where multiprocessing earns its keep.  The split is deliberate:
   plain dicts; the parent appends them.  One writer means no file-lock dance and a
   consistent, resumable on-disk state.
 
+Workers are given the *path* to the vertical's taxonomy rather than a loaded
+object: ``Pool`` initargs must pickle cleanly, and re-reading one small YAML once
+per process is free next to the network work it is about to do.
+
 Session refresh is the parent's job.  Before each batch it re-warms the
 ``cf_clearance`` cookie if it has aged out; if a batch still hits challenges (cookie
 died early), the parent force-refreshes and retries just that batch's failures.
@@ -30,6 +34,7 @@ from ..logging_utils import ProgressTracker, get_logger
 from ..parsers import ListingParser
 from ..session import SessionStore
 from ..storage import ImageStore, Storage
+from ..taxonomy import Taxonomy
 
 logger = get_logger(__name__)
 
@@ -43,11 +48,12 @@ _W: dict[str, Any] = {}
 
 def _init_worker(session_path: str, profile_dir: str, impersonate: str, timeout: int,
                  max_retries: int, images_dir: str, images_enabled: bool,
-                 max_per_listing: int | None, prefer_webp: bool) -> None:
-    store = SessionStore(Path(session_path), Path(profile_dir))
+                 max_per_listing: int | None, prefer_webp: bool,
+                 taxonomy_path: str, referer: str) -> None:
+    store = SessionStore(Path(session_path), Path(profile_dir), warmup_url=referer)
     _W["client"] = LalafoClient(store, impersonate=impersonate, timeout=timeout,
-                                max_retries=max_retries)
-    _W["parser"] = ListingParser()
+                                max_retries=max_retries, referer=referer)
+    _W["parser"] = ListingParser(Taxonomy.load(taxonomy_path))
     _W["images"] = ImageStore(Path(images_dir))
     _W["images_enabled"] = images_enabled
     _W["max_per_listing"] = max_per_listing
@@ -241,6 +247,8 @@ class ListingCrawler:
             self.config.images.enabled,
             self.config.images.max_per_listing,
             self.config.images.prefer_webp,
+            str(self.config.taxonomy_path),
+            self.config.taxonomy.site_url,
         )
 
 

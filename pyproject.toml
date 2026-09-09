@@ -1,6 +1,6 @@
 [project]
 name = "lalafo-parser"
-version = "1.0.0"
+version = "1.1.0"
 description = "Scraper and HuggingFace dataset builder for lalafo.kg (Kyrgyzstan real estate)"
 readme = "README.md"
 requires-python = ">=3.10"

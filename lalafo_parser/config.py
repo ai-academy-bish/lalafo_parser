@@ -1,8 +1,13 @@
-"""Typed configuration, loaded from `config.yaml`.
+"""Typed configuration, loaded from a run config under `configs/`.
 
 Every knob the pipeline honours lives here as a dataclass, so configuration is
 validated and discoverable rather than a dict of strings passed around.  A typo in
 the YAML fails loudly at load time instead of being silently ignored.
+
+A run config answers *how* to crawl (workers, images, storage, dataset).  *What* to
+crawl comes from the taxonomy file it points at with ``categories_file`` — see
+``taxonomy.py``.  Swapping that one line is what turns a real-estate run into a car
+run.
 """
 
 from __future__ import annotations
@@ -14,7 +19,11 @@ from typing import Any
 
 import yaml
 
-from .constants import DEALS, PROPERTY_TYPES, REGIONS
+from .constants import REGIONS
+from .taxonomy import Taxonomy
+
+#: Used when a run config names no taxonomy — keeps a bare `Config()` usable.
+DEFAULT_CATEGORIES_FILE = "configs/categories/realestate.yaml"
 
 
 @dataclass(slots=True)
@@ -22,12 +31,18 @@ class ScopeConfig:
     """What to crawl.
 
     The crawl walks one *leaf category* per stream; `property_types` × `deals`
-    selects which leaves.  `regions` optionally restricts to certain oblasts
-    (best-effort, by city) — by default every region of Kyrgyzstan is kept.
+    selects which leaves **out of the taxonomy the run config points at**.
+    `regions` optionally restricts to certain oblasts (best-effort, by city) — by
+    default every region of Kyrgyzstan is kept.
+
+    `property_types` / `deals` default to everything the taxonomy defines, so a
+    config that names neither crawls the whole vertical.  They cannot be validated
+    at construction time (the taxonomy is not loaded yet), so `Config.load` calls
+    `resolve()` — a typo still fails loudly, just one step later.
     """
 
-    property_types: list[str] = field(default_factory=lambda: list(PROPERTY_TYPES))
-    deals: list[str] = field(default_factory=lambda: list(DEALS))
+    property_types: list[str] | None = None
+    deals: list[str] | None = None
     regions: list[str] = field(default_factory=lambda: list(REGIONS))
     #: Stop after N listings (per run, across the scope). None = crawl everything.
     max_listings: int | None = None
@@ -39,20 +54,40 @@ class ScopeConfig:
     partition_oversize_by_city: bool = True
 
     def __post_init__(self) -> None:
-        unknown = set(self.property_types) - set(PROPERTY_TYPES)
-        if unknown:
-            raise ValueError(f"unknown property types: {sorted(unknown)}")
-        unknown = set(self.deals) - set(DEALS)
-        if unknown:
-            raise ValueError(f"unknown deals: {sorted(unknown)}")
+        # Regions are site-wide, so they *can* be checked immediately.
         unknown = set(self.regions) - set(REGIONS)
         if unknown:
             raise ValueError(
                 f"unknown regions: {sorted(unknown)}. "
                 f"Only Kyrgyzstan is supported: {sorted(REGIONS)}"
             )
+
+    def resolve(self, taxonomy: Taxonomy) -> None:
+        """Apply the taxonomy's defaults, then validate the selection against it."""
+        if self.property_types is None:
+            self.property_types = list(taxonomy.property_types)
+        if self.deals is None:
+            self.deals = list(taxonomy.deals)
+
+        source = taxonomy.source.name
+        unknown = set(self.property_types) - set(taxonomy.property_types)
+        if unknown:
+            raise ValueError(
+                f"unknown property types: {sorted(unknown)}. "
+                f"{source} defines: {list(taxonomy.property_types)}"
+            )
+        unknown = set(self.deals) - set(taxonomy.deals)
+        if unknown:
+            raise ValueError(
+                f"unknown deals: {sorted(unknown)}. {source} defines: {list(taxonomy.deals)}"
+            )
         if not self.property_types or not self.deals:
             raise ValueError("scope must enable at least one property type and deal")
+        if not taxonomy.categories_for(self.property_types, self.deals):
+            raise ValueError(
+                f"scope selects no categories at all — no leaf in {source} has both "
+                f"a listed property type and a listed deal"
+            )
 
 
 @dataclass(slots=True)
@@ -121,7 +156,11 @@ class ImageConfig:
 
 @dataclass(slots=True)
 class StorageConfig:
-    """Where scraped data lands (relative to the project root)."""
+    """Where scraped data lands (relative to the project root).
+
+    Give each vertical its own ``root`` — two verticals sharing one ``data/`` would
+    interleave their listings in the same JSONL tables.
+    """
 
     root: str = "data"
     photos_dirname: str = "images"
@@ -192,6 +231,9 @@ class Config:
     """Root configuration object."""
 
     project_root: Path = field(default_factory=Path.cwd)
+    #: The taxonomy file this run crawls — relative to the project root.  This one
+    #: line is the difference between a real-estate run and a car run.
+    categories_file: str = DEFAULT_CATEGORIES_FILE
     scope: ScopeConfig = field(default_factory=ScopeConfig)
     session: SessionConfig = field(default_factory=SessionConfig)
     http: HttpConfig = field(default_factory=HttpConfig)
@@ -200,6 +242,8 @@ class Config:
     storage: StorageConfig = field(default_factory=StorageConfig)
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    #: Loaded lazily from ``categories_file`` and cached; use ``.taxonomy``.
+    _taxonomy: Taxonomy | None = field(default=None, repr=False, compare=False)
 
     @classmethod
     def load(cls, path: str | Path = "config.yaml") -> Config:
@@ -210,8 +254,9 @@ class Config:
 
         dataset_raw = dict(raw.get("dataset") or {})
         hub = HubConfig(**(dataset_raw.pop("hub", {}) or {}))
-        return cls(
-            project_root=path.parent,
+        config = cls(
+            project_root=_project_root(path),
+            categories_file=str(raw.get("categories_file") or DEFAULT_CATEGORIES_FILE),
             scope=ScopeConfig(**(raw.get("scope") or {})),
             session=SessionConfig(**(raw.get("session") or {})),
             http=HttpConfig(**(raw.get("http") or {})),
@@ -221,6 +266,21 @@ class Config:
             dataset=DatasetConfig(hub=hub, **dataset_raw),
             logging=LoggingConfig(**(raw.get("logging") or {})),
         )
+        # Needs the taxonomy, so it cannot happen in ScopeConfig.__post_init__.
+        config.scope.resolve(config.taxonomy)
+        return config
+
+    @property
+    def taxonomy(self) -> Taxonomy:
+        """The vertical being crawled (leaf categories, param map, special params)."""
+        if self._taxonomy is None:
+            self._taxonomy = Taxonomy.load(self.taxonomy_path)
+        return self._taxonomy
+
+    @property
+    def taxonomy_path(self) -> Path:
+        path = Path(self.categories_file)
+        return path if path.is_absolute() else (self.project_root / path).resolve()
 
     @property
     def paths(self) -> ResolvedStorage:
@@ -237,3 +297,17 @@ class Config:
     @property
     def dataset_dir(self) -> Path:
         return (self.project_root / self.dataset.output_dir).resolve()
+
+
+def _project_root(config_path: Path) -> Path:
+    """The repo root — where ``data/``, ``logs/`` and ``hf_dataset/`` belong.
+
+    Run configs live in ``configs/``, so the config's own directory is no longer the
+    project root.  Walk up to the directory holding ``pyproject.toml``; fall back to
+    the config's directory, which is what a root-level ``config.yaml`` has always
+    resolved to.
+    """
+    for candidate in config_path.parents:
+        if (candidate / "pyproject.toml").exists():
+            return candidate
+    return config_path.parent

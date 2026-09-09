@@ -1,11 +1,14 @@
 """Build the HuggingFace dataset — one subset (config) per table.
 
-Five tabular subsets (listings, users, complexes, cities) plus an embedded image
-subset.  Images are embedded as a HF `Image` feature and written as sharded Parquet
-rather than shipped as loose files: a repo of hundreds of thousands of small files
-is painfully slow to clone and load; embedded-and-sharded is the standard path and
-lets a consumer do ``load_dataset("<repo>", "images", split="train")`` and get
-decoded PIL images.
+Four tabular subsets (listings, users, complexes, cities) plus an embedded image
+subset.  A subset with no rows is skipped, so a vertical that has no residential
+complexes (cars) simply ships no ``complexes`` table.
+
+Images are embedded as a HF `Image` feature and written as sharded Parquet rather
+than shipped as loose files: a repo of hundreds of thousands of small files is
+painfully slow to clone and load; embedded-and-sharded is the standard path and lets
+a consumer do ``load_dataset("<repo>", "images", split="train")`` and get decoded
+PIL images.
 
 Derived counts (a user's ``ads_count``, a complex's / city's ``listing_count``) are
 computed here in a single pass over the listings, so the crawler never has to hold
@@ -197,10 +200,17 @@ class HFDatasetBuilder:
 
     def _write_card(self, counts: dict[str, int]) -> None:
         subsets = [n for n in (*TABLE_SUBSETS, "images") if counts.get(n)]
-        (self.out_dir / "README.md").write_text(build_card(counts, subsets), encoding="utf-8")
-        docs = self.config.project_root / "docs" / "lalafo_dataset.md"
-        if docs.exists():
-            shutil.copy(docs, self.out_dir / "DATASET_GUIDE.md")
+        card = build_card(counts, subsets, self.config.taxonomy)
+        (self.out_dir / "README.md").write_text(card, encoding="utf-8")
+        # Each vertical ships its *own* long-form guide, or none — never another
+        # vertical's (a car dataset must not carry the real-estate guide).
+        guide = self.config.taxonomy.guide
+        if guide:
+            path = self.config.project_root / guide
+            if path.exists():
+                shutil.copy(path, self.out_dir / "DATASET_GUIDE.md")
+            else:
+                logger.warning("taxonomy declares guide %s but it does not exist", path)
 
     def _push(self, counts: dict[str, int]) -> None:
         """Upload ``hf_dataset/`` verbatim so the README's ``configs:`` paths and the
@@ -216,7 +226,10 @@ class HFDatasetBuilder:
         logger.info("pushing %.0f MB to https://huggingface.co/datasets/%s", total_mb, hub.repo_id)
         api.upload_folder(
             folder_path=str(self.out_dir), repo_id=hub.repo_id, repo_type="dataset",
-            commit_message=f"Add lalafo real-estate dataset ({counts.get('listings', 0)} listings)",
+            commit_message=(
+                f"Add lalafo {self.config.taxonomy.vertical} dataset "
+                f"({counts.get('listings', 0)} listings)"
+            ),
         )
         logger.info("[bold green]pushed[/] -> https://huggingface.co/datasets/%s", hub.repo_id)
 

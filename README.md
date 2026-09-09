@@ -1,15 +1,20 @@
 # lalafo.kg — Scraper & HuggingFace Dataset Builder
 
-Scrapes the **real-estate section of [lalafo.kg](https://lalafo.kg/kyrgyzstan/nedvizhimost)** —
-Kyrgyzstan's largest *informal* classifieds board — into a clean, relational
-HuggingFace dataset: listings, sellers, residential complexes, cities and images.
+Scrapes [lalafo.kg](https://lalafo.kg) — Kyrgyzstan's largest *informal* classifieds
+board — into clean, relational HuggingFace datasets: listings, sellers, cities and
+images. **Two verticals ship today, real estate and used cars, and adding a third is
+a YAML file, not a code change.**
 
 Where the curated boards (house.kg) show the polished market, lalafo is the noisy
 street-level one: bigger, messier, and far richer in raw signal — phone numbers,
 seller reputation, five engagement counters, promotion campaigns, perceptual image
 hashes. This project turns that chaos into a research-grade dataset.
 
-* **~78 000 real-estate listings** across every property type, deal and region
+| vertical | config | what it crawls | scale |
+|---|---|---|---|
+| **real estate** | `configs/realestate.yaml` | 77 leaves under «Недвижимость» — every property type, deal and region | ~78 000 ads |
+| **cars** | `configs/cars.yaml` | 125 brand leaves under «Транспорт / Продажа авто» | ~55 000 ads |
+
 * **~600 000+ images**, embedded as a HuggingFace `Image` feature (+ perceptual hash)
 * Phone numbers, coordinates, prices (+ price history), absolute timestamps
 * Seller reputation, complexes (ЖК), promotion flags — everything lalafo exposes
@@ -31,12 +36,31 @@ HTML to scrape and plain HTTP gets a 403. The pipeline defeats this in two moves
 Everything else follows the house.kg engine's philosophy: strict layering,
 append-only JSONL for resumability, one file for every site-specific constant.
 
+### One engine, many sections
+
+`constants.py` holds what is true of the **site** (endpoints, headers, geography).
+What is true of one **section** — its leaf categories, its attribute map, its special
+params — lives in a *taxonomy* YAML under `configs/categories/`. A run config names
+the taxonomy it crawls:
+
+```yaml
+# configs/cars.yaml
+categories_file: configs/categories/cars.yaml
+```
+
+That one line is the whole difference between a real-estate run and a car run. The
+crawler, the parser, the storage layer and the dataset builder are identical.
+
 ## Documentation
 
 | Document | For whom |
 |---|---|
-| **[`docs/lalafo_dataset.md`](docs/lalafo_dataset.md)** | **Anyone using the data.** Every field, every relation, real volumes, and every pitfall of an unmoderated board (negotiable prices are null; duplicates; mis-filed categories; PII). |
-| **[`docs/code_guide.md`](docs/code_guide.md)** | **Anyone maintaining the scraper.** Module by module: the Cloudflare bypass, the capped-feed workaround, the multiprocessing detail stage. Read it before changing anything. |
+| **[`docs/lalafo_dataset.md`](docs/lalafo_dataset.md)** | **Anyone using the real-estate data.** Every field, every relation, real volumes, and every pitfall of an unmoderated board (negotiable prices are null; duplicates; mis-filed categories; PII). |
+| **[`docs/cars_dataset.md`](docs/cars_dataset.md)** | **Anyone using the car data.** The same, for used cars — plus the traps specific to this branch: mixed KGS/USD pricing, multi-select attributes, missing mileage, `vin_status` is not a VIN. |
+| **[`docs/code_guide.md`](docs/code_guide.md)** | **Anyone maintaining the scraper.** Module by module: the Cloudflare bypass, the capped-feed workaround, the multiprocessing detail stage, and how to add a vertical. Read it before changing anything. |
+
+Each vertical's guide ships **with its dataset** as `DATASET_GUIDE.md` — declared by
+the `guide:` key in the taxonomy, so a car dataset never carries the real-estate one.
 
 ## Quick start
 
@@ -54,6 +78,17 @@ Then the full run (resumable — Ctrl-C and re-run any time):
 ```bash
 make parsing_run
 ```
+
+Every target takes `VERTICAL=` — it selects `configs/<name>.yaml`, defaulting to
+`realestate`:
+
+```bash
+make parsing_run VERTICAL=cars LIMIT=200
+make validate    VERTICAL=cars
+make make_hf_dataset VERTICAL=cars
+```
+
+`make help` lists the verticals it finds in `configs/`.
 
 ## Requirements
 
@@ -73,45 +108,105 @@ make parsing_run
 | `make parsing_run` | Scrape (resumable). `LIMIT=N` for a smaller run |
 | `make validate` | Integrity checks: primary keys, foreign keys, images |
 | `make make_hf_dataset` | Build the Parquet subsets, and push if configured |
+| `make categories` | Generate a taxonomy from the live category tree (see below) |
 | `make clean` | Remove `data/`, `hf_dataset/` and `logs/` |
+
+All of them accept `VERTICAL=<name>` (or `CONFIG=<path>` to be explicit).
 
 ## Configuration
 
-Everything lives in [`config.yaml`](config.yaml) — property types, deals, regions,
-the Cloudflare session, worker/process counts, images, and where the dataset goes.
+Configs live in [`configs/`](configs/), split in two:
+
+```
+configs/
+├── realestate.yaml          run config — *how* to crawl
+├── cars.yaml
+└── categories/
+    ├── realestate.yaml      taxonomy — *what* to crawl
+    └── cars.yaml
+```
+
+A **run config** holds the scope, the Cloudflare session, worker/process counts,
+images and where the dataset goes:
 
 ```yaml
+categories_file: configs/categories/cars.yaml   # which vertical
+
 scope:
-  property_types: [apartment, house, commercial, land, room, garage, newbuild]
-  deals: [sale, rent, daily_rent]
+  property_types: [car]
+  deals: [sale]
   max_listings: null          # null = crawl everything
 
 multiprocessing:
   enabled: true
   processes: null             # null = os.cpu_count()
 
+storage:
+  root: data_cars             # give every vertical its own root
+
 dataset:
   hub:
     push: true
-    repo_id: your-name/lalafo-kg-realestate
+    repo_id: your-name/lalafo-kg-cars
 ```
+
+Omit `property_types` / `deals` entirely to crawl every leaf the taxonomy defines.
+
+A **taxonomy** holds the leaf categories and the attribute map:
+
+```yaml
+vertical: cars
+site_path: /kyrgyzstan/avtomobili-s-probegom
+
+params:                       # param-id -> English column
+  62: year
+  56: mileage_km
+
+categories:                   # leaf id -> classification
+  1608: {type: car, deal: sale, brand: "Toyota", name: "Toyota"}
+```
+
+`type` and `deal` are the two classification axes (columns `property_type` and
+`deal`). **Any other key is a free-form label** that becomes its own column — that is
+how each car listing gets a `brand`, taken from the category rather than parsed out
+of the title. A param not listed under `params:` is never dropped, only
+transliterated, so a taxonomy with `params: {}` already produces a usable dataset.
 
 The HuggingFace token is read from the environment (`HF_TOKEN`) or from
 `hf auth login` — **never put it in the YAML.**
 
+### Adding a vertical
+
+No code — generate the taxonomy from lalafo's live category tree, then point a run
+config at it:
+
+```bash
+make categories ROOT=1625 OUT=configs/categories/moto.yaml \
+                NAME=moto TYPE=moto DEAL=sale LABEL=subcategory
+cp configs/cars.yaml configs/moto.yaml     # edit categories_file + storage.root
+make parsing_run VERTICAL=moto LIMIT=200
+```
+
+Review the generated `type`/`deal` before a full run: the generator stamps what you
+passed onto every leaf, because whether a branch splits by deal is a judgement it
+cannot make for you. `docs/code_guide.md` §8 has the full checklist.
+
 ## Output
 
 ```
-data/
+data/            (storage.root — data_cars/ for the car vertical)
   raw/         discovered.jsonl, listings.jsonl, users.jsonl,
                complexes.jsonl, cities.jsonl, images.jsonl
   images/      image files (uuid4 names)
   state/       cf_session.json + the browser profile
-hf_dataset/
+hf_dataset/      (dataset.output_dir)
   data/*.parquet    one subset per table + sharded image subset
   README.md         dataset card
 logs/          one log file per run
 ```
+
+A subset with no rows is skipped, so the car dataset simply ships no `complexes`
+table — residential complexes are a real-estate concept.
 
 ### Loading the dataset
 

@@ -1,0 +1,176 @@
+# Car taxonomy for lalafo.kg — «Транспорт / Продажа авто» (root 1502).
+#
+# The leaves of this branch are *brands*, not deal types — so every leaf shares
+# `type: car` / `deal: sale` and carries an extra `brand` label, which becomes a
+# `brand` column on the listing. Model/year/mileage come from the params below.
+#
+# Other transport branches (Автозапчасти 1620, Автоуслуги 2155, Мототехника 1625,
+# Коммерческий транспорт 1725, Велосипеды 1483, Шины и диски 1621, …) can be added
+# here or as sibling files — nothing in the code is car-specific.
+
+vertical: cars
+title: "Kyrgyzstan Cars (used-car market)"
+root_category: 1502
+site_path: /kyrgyzstan/avtomobili-s-probegom
+guide: docs/cars_dataset.md
+
+# No dimension-table params here: the ЖК / developer / district concepts are
+# real-estate-only, so the `complexes` table stays empty for this vertical.
+special_params: {}
+
+# param-id -> English column. Ids differ per branch on lalafo (mileage is 56 for
+# cars but 2063 for trucks) — that is why the map lives with the taxonomy.
+#
+# Names promise only what the values deliver: `year`/`mileage_km`/`engine_volume_l`
+# are numeric-as-string, but `vin_status` and `battery_capacity` are categorical, so
+# they are NOT named as if they were a VIN or a kWh figure. `fuel`,
+# `technical_condition` and `payment_terms` are multi-select — see the dataset guide.
+params:
+  49:   model                 # Модель
+  62:   year                  # Год
+  56:   mileage_km            # Пробег (км.)
+  66:   engine_volume_l       # Объем двигателя
+  65:   fuel                  # Топливо
+  64:   transmission          # Коробка передач
+  244:  drive                 # Привод
+  63:   body_type             # Кузов
+  106:  steering_wheel        # Руль
+  105:  color                 # Цвет
+  29:   condition             # Состояние
+  1155: technical_condition   # Техническое состояние
+  1156: vin_status            # VIN код — a FLAG («с VIN кодом» / «без VIN кода»), not a VIN
+  1157: customs_cleared       # Растаможка
+  5151: registration_country  # Страна учета
+  242:  availability          # Наличие
+  1154: payment_terms         # Расчет
+  5712: battery_capacity      # Емкость батареи — a band («91–100 кВт·ч»), not a number
+
+# 125 brand leaves under «Продажа авто», biggest first (trailing number =
+# ads on the site when this file was generated). None exceeds the ~9 000 feed cap,
+# so city partitioning is rarely needed for this branch.
+categories:
+  1608: {type: car, deal: sale, brand: "Toyota", name: "Toyota"}                      # 7759
+  1585: {type: car, deal: sale, brand: "Mercedes-Benz", name: "Mercedes-Benz"}        # 5699
+  1570: {type: car, deal: sale, brand: "Honda", name: "Honda"}                        # 4457
+  1572: {type: car, deal: sale, brand: "Hyundai", name: "Hyundai"}                    # 4368
+  1576: {type: car, deal: sale, brand: "Kia", name: "Kia"}                            # 4274
+  1610: {type: car, deal: sale, brand: "Volkswagen", name: "Volkswagen"}              # 3235
+  1557: {type: car, deal: sale, brand: "BMW", name: "BMW"}                            # 2510
+  1605: {type: car, deal: sale, brand: "Subaru", name: "Subaru"}                      # 2270
+  1563: {type: car, deal: sale, brand: "Daewoo", name: "Daewoo"}                      # 2241
+  1581: {type: car, deal: sale, brand: "Lexus", name: "Lexus"}                        # 1955
+  1590: {type: car, deal: sale, brand: "Nissan", name: "Nissan"}                      # 1845
+  1555: {type: car, deal: sale, brand: "Audi", name: "Audi"}                          # 1757
+  1584: {type: car, deal: sale, brand: "Mazda", name: "Mazda"}                        # 1599
+  1577: {type: car, deal: sale, brand: "ВАЗ (ЛАДА)", name: "ВАЗ (ЛАДА)"}              # 1365
+  1559: {type: car, deal: sale, brand: "Chevrolet", name: "Chevrolet"}                # 1363
+  1589: {type: car, deal: sale, brand: "Mitsubishi", name: "Mitsubishi"}              # 989
+  1612: {type: car, deal: sale, brand: "Другие автомобили", name: "Другие автомобили"}  # 879
+  1569: {type: car, deal: sale, brand: "Ford", name: "Ford"}                          # 787
+  1604: {type: car, deal: sale, brand: "Ssangyong", name: "Ssangyong"}                # 705
+  1543: {type: car, deal: sale, brand: "BYD", name: "BYD"}                            # 537
+  1591: {type: car, deal: sale, brand: "Opel", name: "Opel"}                          # 444
+  1542: {type: car, deal: sale, brand: "Changan", name: "Changan"}                    # 354
+  1597: {type: car, deal: sale, brand: "Renault", name: "Renault"}                    # 228
+  1508: {type: car, deal: sale, brand: "ГАЗ", name: "ГАЗ"}                            # 226
+  1580: {type: car, deal: sale, brand: "Land Rover", name: "Land Rover"}              # 220
+  6380: {type: car, deal: sale, brand: "Lixiang", name: "Lixiang"}                    # 194
+  11846: {type: car, deal: sale, brand: "GAC", name: "GAC"}                           # 178
+  3297: {type: car, deal: sale, brand: "ЗИЛ", name: "ЗИЛ"}                            # 169
+  1606: {type: car, deal: sale, brand: "Suzuki", name: "Suzuki"}                      # 139
+  1564: {type: car, deal: sale, brand: "Daihatsu", name: "Daihatsu"}                  # 135
+  1534: {type: car, deal: sale, brand: "Geely", name: "Geely"}                        # 95
+  1515: {type: car, deal: sale, brand: "Москвич", name: "Москвич"}                    # 89
+  1588: {type: car, deal: sale, brand: "Mini", name: "Mini"}                          # 88
+  1575: {type: car, deal: sale, brand: "Jeep", name: "Jeep"}                          # 80
+  1566: {type: car, deal: sale, brand: "Dodge", name: "Dodge"}                        # 73
+  1614: {type: car, deal: sale, brand: "Infiniti", name: "Infiniti"}                  # 73
+  8245: {type: car, deal: sale, brand: "Weltmeister", name: "Weltmeister"}            # 73
+  1537: {type: car, deal: sale, brand: "Dongfeng", name: "Dongfeng"}                  # 71
+  1611: {type: car, deal: sale, brand: "Volvo", name: "Volvo"}                        # 70
+  1587: {type: car, deal: sale, brand: "Microcar", name: "Microcar"}                  # 66
+  1602: {type: car, deal: sale, brand: "Skoda", name: "Skoda"}                        # 62
+  1512: {type: car, deal: sale, brand: "УАЗ", name: "УАЗ"}                            # 58
+  13311: {type: car, deal: sale, brand: "Renault Samsung", name: "Renault Samsung"}   # 56
+  13071: {type: car, deal: sale, brand: "Hozon", name: "Hozon"}                       # 53
+  6658: {type: car, deal: sale, brand: "Zeekr", name: "Zeekr"}                        # 49
+  1573: {type: car, deal: sale, brand: "Isuzu", name: "Isuzu"}                        # 48
+  1511: {type: car, deal: sale, brand: "Jetour", name: "Jetour"}                      # 45
+  1558: {type: car, deal: sale, brand: "Cadillac", name: "Cadillac"}                  # 44
+  1541: {type: car, deal: sale, brand: "Chery", name: "Chery"}                        # 43
+  4133: {type: car, deal: sale, brand: "Tesla", name: "Tesla"}                        # 43
+  7878: {type: car, deal: sale, brand: "JMEV", name: "JMEV"}                          # 41
+  1535: {type: car, deal: sale, brand: "FAW", name: "FAW"}                            # 39
+  1560: {type: car, deal: sale, brand: "Chrysler", name: "Chrysler"}                  # 30
+  1593: {type: car, deal: sale, brand: "Peugeot", name: "Peugeot"}                    # 29
+  1613: {type: car, deal: sale, brand: "Acura", name: "Acura"}                        # 26
+  1594: {type: car, deal: sale, brand: "Porsche", name: "Porsche"}                    # 26
+  1509: {type: car, deal: sale, brand: "Ravon", name: "Ravon"}                        # 24
+  89: {type: car, deal: sale, brand: "Voyah", name: "Voyah"}                          # 24
+  1546: {type: car, deal: sale, brand: "BAW", name: "BAW"}                            # 22
+  1524: {type: car, deal: sale, brand: "LDV", name: "LDV"}                            # 22
+  1526: {type: car, deal: sale, brand: "JAC", name: "JAC"}                            # 19
+  1522: {type: car, deal: sale, brand: "Lincoln", name: "Lincoln"}                    # 18
+  6339: {type: car, deal: sale, brand: "Roewe", name: "Roewe"}                        # 18
+  1529: {type: car, deal: sale, brand: "Huanghai", name: "Huanghai"}                  # 17
+  1540: {type: car, deal: sale, brand: "ЗАЗ", name: "ЗАЗ"}                            # 17
+  1533: {type: car, deal: sale, brand: "GMC", name: "GMC"}                            # 16
+  1532: {type: car, deal: sale, brand: "Great Wall", name: "Great Wall"}              # 16
+  1601: {type: car, deal: sale, brand: "Seat", name: "Seat"}                          # 16
+  1561: {type: car, deal: sale, brand: "Citroen", name: "Citroen"}                    # 15
+  1571: {type: car, deal: sale, brand: "Hummer", name: "Hummer"}                      # 15
+  1574: {type: car, deal: sale, brand: "Jaguar", name: "Jaguar"}                      # 15
+  1586: {type: car, deal: sale, brand: "MG", name: "MG"}                              # 14
+  1568: {type: car, deal: sale, brand: "Fiat", name: "Fiat"}                          # 13
+  1527: {type: car, deal: sale, brand: "Iveco", name: "Iveco"}                        # 13
+  1549: {type: car, deal: sale, brand: "Scion", name: "Scion"}                        # 12
+  1523: {type: car, deal: sale, brand: "LIFAN", name: "LIFAN"}                        # 9
+  5295: {type: car, deal: sale, brand: "Tank", name: "Tank"}                          # 9
+  1599: {type: car, deal: sale, brand: "Rover", name: "Rover"}                        # 5
+  1600: {type: car, deal: sale, brand: "Saab", name: "Saab"}                          # 5
+  1609: {type: car, deal: sale, brand: "Vauxhall", name: "Vauxhall"}                  # 5
+  1544: {type: car, deal: sale, brand: "Buick", name: "Buick"}                        # 4
+  6659: {type: car, deal: sale, brand: "Exeed", name: "Exeed"}                        # 4
+  1517: {type: car, deal: sale, brand: "IZH", name: "IZH"}                            # 4
+  1525: {type: car, deal: sale, brand: "JMC", name: "JMC"}                            # 4
+  1596: {type: car, deal: sale, brand: "Reliant", name: "Reliant"}                    # 4
+  1516: {type: car, deal: sale, brand: "ЛуАЗ", name: "ЛуАЗ"}                          # 4
+  1545: {type: car, deal: sale, brand: "Brilliance", name: "Brilliance"}              # 3
+  1547: {type: car, deal: sale, brand: "Asia", name: "Asia"}                          # 2
+  1556: {type: car, deal: sale, brand: "Bentley", name: "Bentley"}                    # 2
+  1562: {type: car, deal: sale, brand: "Dacia", name: "Dacia"}                        # 2
+  1528: {type: car, deal: sale, brand: "Iran Khodro", name: "Iran Khodro"}            # 2
+  1582: {type: car, deal: sale, brand: "Lotus", name: "Lotus"}                        # 2
+  1595: {type: car, deal: sale, brand: "Proton", name: "Proton"}                      # 2
+  1551: {type: car, deal: sale, brand: "Aixam", name: "Aixam"}                        # 1
+  1553: {type: car, deal: sale, brand: "Alfa Romeo", name: "Alfa Romeo"}              # 1
+  1539: {type: car, deal: sale, brand: "Datsun", name: "Datsun"}                      # 1
+  1538: {type: car, deal: sale, brand: "Derways", name: "Derways"}                    # 1
+  1567: {type: car, deal: sale, brand: "Ferrari", name: "Ferrari"}                    # 1
+  1531: {type: car, deal: sale, brand: "Hafei", name: "Hafei"}                        # 1
+  1530: {type: car, deal: sale, brand: "Haima", name: "Haima"}                        # 1
+  1579: {type: car, deal: sale, brand: "Lancia", name: "Lancia"}                      # 1
+  1583: {type: car, deal: sale, brand: "Maserati", name: "Maserati"}                  # 1
+  1514: {type: car, deal: sale, brand: "RAF", name: "RAF"}                            # 1
+  1518: {type: car, deal: sale, brand: "Rolls-Royce", name: "Rolls-Royce"}            # 1
+  12181: {type: car, deal: sale, brand: "Shineray", name: "Shineray"}                 # 1
+  1603: {type: car, deal: sale, brand: "Smart", name: "Smart"}                        # 1
+  1513: {type: car, deal: sale, brand: "TagAZ", name: "TagAZ"}                        # 1
+  1507: {type: car, deal: sale, brand: "VIS", name: "VIS"}                            # 1
+  1505: {type: car, deal: sale, brand: "Vortex", name: "Vortex"}                      # 1
+  1506: {type: car, deal: sale, brand: "ZX", name: "ZX"}                              # 1
+  1548: {type: car, deal: sale, brand: "Aro", name: "Aro"}                            # 0
+  1554: {type: car, deal: sale, brand: "Aston Martin", name: "Aston Martin"}          # 0
+  1552: {type: car, deal: sale, brand: "Alpina", name: "Alpina"}                      # 0
+  1565: {type: car, deal: sale, brand: "Daimler", name: "Daimler"}                    # 0
+  1536: {type: car, deal: sale, brand: "Doninvest", name: "Doninvest"}                # 0
+  1578: {type: car, deal: sale, brand: "Lamborghini", name: "Lamborghini"}            # 0
+  1615: {type: car, deal: sale, brand: "Mercury", name: "Mercury"}                    # 0
+  1521: {type: car, deal: sale, brand: "Oldsmobile", name: "Oldsmobile"}              # 0
+  1592: {type: car, deal: sale, brand: "Perodua", name: "Perodua"}                    # 0
+  1520: {type: car, deal: sale, brand: "Plymouth", name: "Plymouth"}                  # 0
+  1519: {type: car, deal: sale, brand: "Pontiac", name: "Pontiac"}                    # 0
+  1550: {type: car, deal: sale, brand: "Saturn", name: "Saturn"}                      # 0
+  1607: {type: car, deal: sale, brand: "Tata", name: "Tata"}                          # 0
+  1504: {type: car, deal: sale, brand: "Tianye", name: "Tianye"}                      # 0
+  4672: {type: car, deal: sale, brand: "Tofas", name: "Tofas"}                        # 0
