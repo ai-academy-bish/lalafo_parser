@@ -2,8 +2,8 @@
 
 Scrapes [lalafo.kg](https://lalafo.kg) — Kyrgyzstan's largest *informal* classifieds
 board — into clean, relational HuggingFace datasets: listings, sellers, cities and
-images. **Two verticals ship today, real estate and used cars, and adding a third is
-a YAML file, not a code change.**
+images. **Three verticals ship today — real estate, used cars and mobile phones —
+and adding the next is a YAML file, not a code change.**
 
 Where the curated boards (house.kg) show the polished market, lalafo is the noisy
 street-level one: bigger, messier, and far richer in raw signal — phone numbers,
@@ -14,6 +14,7 @@ hashes. This project turns that chaos into a research-grade dataset.
 |---|---|---|---|
 | **real estate** | `configs/realestate.yaml` | 77 leaves under «Недвижимость» — every property type, deal and region | ~78 000 ads |
 | **cars** | `configs/cars.yaml` | 125 brand leaves under «Транспорт / Продажа авто» | ~55 000 ads |
+| **phones** | `configs/phones.yaml` | 32 brand leaves under «Мобильные телефоны» — handsets only | ~8 400 ads |
 
 * **~600 000+ images**, embedded as a HuggingFace `Image` feature (+ perceptual hash)
 * Phone numbers, coordinates, prices (+ price history), absolute timestamps
@@ -57,6 +58,7 @@ crawler, the parser, the storage layer and the dataset builder are identical.
 |---|---|
 | **[`docs/lalafo_dataset.md`](docs/lalafo_dataset.md)** | **Anyone using the real-estate data.** Every field, every relation, real volumes, and every pitfall of an unmoderated board (negotiable prices are null; duplicates; mis-filed categories; PII). |
 | **[`docs/cars_dataset.md`](docs/cars_dataset.md)** | **Anyone using the car data.** The same, for used cars — plus the traps specific to this branch: mixed KGS/USD pricing, multi-select attributes, missing mileage, `vin_status` is not a VIN. |
+| **[`docs/phones_dataset.md`](docs/phones_dataset.md)** | **Anyone using the phone data.** The same, for handsets — measured over the full crawl. Its own traps: `model` collapsed from 31 per-brand params and unique only within a brand, five multi-select attributes, and missingness that is brand-structured (battery health is iPhone-only, `device_class` is Android-only). |
 | **[`docs/code_guide.md`](docs/code_guide.md)** | **Anyone maintaining the scraper.** Module by module: the Cloudflare bypass, the capped-feed workaround, the multiprocessing detail stage, and how to add a vertical. Read it before changing anything. |
 
 Each vertical's guide ships **with its dataset** as `DATASET_GUIDE.md` — declared by
@@ -145,6 +147,7 @@ storage:
   root: data_cars             # give every vertical its own root
 
 dataset:
+  stream_upload: true         # see below — needed when images exceed free disk
   hub:
     push: true
     repo_id: your-name/lalafo-kg-cars
@@ -174,6 +177,24 @@ transliterated, so a taxonomy with `params: {}` already produces a usable datase
 
 The HuggingFace token is read from the environment (`HF_TOKEN`) or from
 `hf auth login` — **never put it in the YAML.**
+
+### Publishing an image set larger than your free disk
+
+By default the builder writes every image shard, then uploads the folder — so it
+needs free disk equal to the whole corpus. The car set is ~73 GiB across ~157
+shards, which does not fit on a box with 64 GB free.
+
+`dataset.stream_upload: true` uploads each shard the moment it is written and
+deletes it locally, so **peak disk is one shard (~500 MB)** instead of the whole set.
+Shard names and contents are identical either way — boundaries are planned up front
+from the files' sizes, not discovered while staging.
+
+It also makes a long push **resumable**: shards already present in the repo are
+skipped, so a run interrupted at shard 100 of 157 picks up where it left off rather
+than re-uploading 50 GB.
+
+Streaming requires `hub.push` (it deletes each shard right after sending it); a
+config with one and not the other fails at load time rather than destroying data.
 
 ### Adding a vertical
 

@@ -1,31 +1,30 @@
-# lalafo.kg — used-car run configuration («Транспорт / Продажа авто»).
+# lalafo.kg — mobile-phone run configuration («Мобильные телефоны», root 1360).
 #
-# Same engine, same tables, same resumability as the real-estate run — the only
-# structural difference is the taxonomy this points at.
+# Handsets for sale only: no accessories, no tablets, no laptops, no consoles —
+# those are sibling branches, listed at the top of the taxonomy file.
 #
-#   make parsing_run VERTICAL=cars LIMIT=200      # try small first
+#   make parsing_run VERTICAL=phones LIMIT=200      # try small first
 #
-# The car branch's leaves are *brands*, so `property_types` is just [car] and
-# `deals` is just [sale]; the brand arrives as its own `brand` column, and model /
-# year / mileage / transmission come from the params mapped in the taxonomy file.
+# Same engine, same tables, same resumability as the other verticals. Like cars,
+# the leaves are brands, so `brand` arrives as its own column and model / storage /
+# RAM / battery health come from the params mapped in the taxonomy.
 
 # ---------------------------------------------------------------------------
 # Which vertical (leaf categories, attribute map, special params)
 # ---------------------------------------------------------------------------
-categories_file: configs/categories/cars.yaml
+categories_file: configs/categories/phones.yaml
 
 # ---------------------------------------------------------------------------
 # What to crawl
 # ---------------------------------------------------------------------------
 scope:
-  # Omit property_types / deals entirely to crawl every leaf the taxonomy defines
-  # (here: all 125 brands). Listed explicitly for symmetry with the other configs.
+  # Omit both keys to crawl every leaf the taxonomy defines (here: all 32 brands).
+  # Listed explicitly for symmetry with the other configs.
   property_types:
-    - car
+    - phone
   deals:
     - sale
 
-  # Restrict to certain oblasts (best-effort, by city). All seven by default.
   regions:
     - chui
     - issyk_kul
@@ -35,14 +34,12 @@ scope:
     - osh
     - batken
 
-  # Stop after N listings. null = crawl everything (~55k cars).
+  # Stop after N listings. null = crawl everything (~8 400 handsets).
   max_listings: null
-
-  # Cap feed pages per category stream. null = follow to the last page.
   max_pages_per_stream: null
 
-  # No car brand exceeds the ~9k feed cap today (the biggest, Toyota, is ~8.8k),
-  # so this rarely fires here — kept on because it costs nothing when unneeded.
+  # The biggest leaf (Apple iPhone) is ~3 900 ads — less than half the ~9k feed cap,
+  # so partitioning never fires here. Left on because it costs nothing when unneeded.
   partition_oversize_by_city: true
 
 # ---------------------------------------------------------------------------
@@ -85,9 +82,9 @@ images:
 # ---------------------------------------------------------------------------
 # Where scraped data lands (relative to the project root)
 # ---------------------------------------------------------------------------
-# Its own root, so a car crawl never mixes with data/ from the real-estate run.
+# Its own root, so a phone crawl never mixes with data/ or data_cars/.
 storage:
-  root: data_cars
+  root: data_phones
   raw_dirname: raw
   photos_dirname: images
   state_dirname: state
@@ -96,20 +93,21 @@ storage:
 # HuggingFace dataset
 # ---------------------------------------------------------------------------
 dataset:
-  output_dir: hf_dataset_cars
+  output_dir: hf_dataset_phones
   include_images: true
   max_shard_size: 500MB
 
-  # The car image corpus (~73 GiB over ~157 shards) is larger than the free disk on
-  # a typical box, and the default builder stages every shard before uploading.
-  # Streaming uploads each shard and deletes it immediately, so peak local disk is
-  # one shard (~500 MB) instead of the whole set. Requires hub.push.
-  # An interrupted run resumes: shards already in the repo are skipped.
-  stream_upload: true
+  # ~8 400 ads is roughly a tenth of the car set, so the images should fit on disk
+  # comfortably and the default staged upload is fine. If they do not, set
+  # `stream_upload: true` (it requires hub.push).
+  stream_upload: false
 
   hub:
+    # Off until you have decided where this goes. Note listings carry plaintext
+    # phone numbers — pick `private: true` or strip the contact columns before
+    # publishing. See docs/cars_dataset.md §6.5.
     push: true
-    repo_id: aiacademy-kg/lalafo-kg-cars
+    repo_id: aiacademy-kg/lalafo-kg-phones
     private: false
     token_env: HF_TOKEN
 

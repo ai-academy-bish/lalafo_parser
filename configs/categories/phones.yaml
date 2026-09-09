@@ -1,0 +1,120 @@
+# Mobile-phone taxonomy for lalafo.kg — «Мобильные телефоны» (root 1360).
+#
+# Handsets for sale, and nothing else. The neighbours are deliberately excluded,
+# each of them a sibling branch that would be its own taxonomy file:
+#
+#   1359  Аксессуары для мобильных телефонов  ~6 000  cases, chargers, headphones
+#   6652  Скупка мобильных телефонов            ~970  "wanted" ads — buyers, not sellers
+#   4720  Планшеты                              ~825  tablets (a separate branch)
+#   1341  Настольные ПК и комплектующие      ~18 600  desktops
+#   1343  Ноутбуки и аксессуары               ~7 700  laptops
+#   1396  Видеоигры и приставки               ~4 800  consoles
+#
+# Like the car branch, the leaves here are *brands*, so every leaf shares
+# `type: phone` / `deal: sale` and carries a `brand` label. Model, storage, RAM and
+# battery health come from the params below.
+#
+# Generated with `make categories ROOT=1360 …`, then reviewed: the axes were checked
+# against the branch and the param map filled in from the live attribute schema
+# (`Api.PARAM_FILTER` for all 32 leaves).
+
+vertical: phones
+title: "Kyrgyzstan Mobile Phones (handsets for sale)"
+root_category: 1360
+site_path: /mobilnye-telefony-i-aksessuary/mobilnye-telefony
+guide: docs/phones_dataset.md
+
+# No dimension-table concepts in this branch (ЖК / developer / district are
+# real-estate-only), so the `complexes` table stays empty for this vertical.
+special_params: {}
+
+params:
+  # NOTE Модель is a per-brand enum: lalafo gives every brand leaf its own param
+  # id and its own value list. All 31 of them collapse into ONE 'model' column —
+  # the same synonym collapse the real-estate taxonomy does for Этаж (226 & 3299).
+  # Without it every brand would grow its own near-empty column.
+  183:  model                 # Apple iPhone
+  225:  model                 # Samsung
+  230:  model                 # Xiaomi
+  314:  model                 # Huawei
+  315:  model                 # Lenovo
+  316:  model                 # LG
+  317:  model                 # Nokia
+  318:  model                 # Meizu
+  319:  model                 # Sony
+  320:  model                 # Motorola
+  897:  model                 # Honor
+  898:  model                 # Oppo
+  899:  model                 # OnePlus
+  900:  model                 # Asus
+  901:  model                 # Philips
+  902:  model                 # Vivo
+  1301: model                 # Poco
+  1308: model                 # Ежевика
+  1310: model                 # Fly
+  1314: model                 # Google
+  1316: model                 # HTC
+  1319: model                 # Infinix
+  1321: model                 # Inoi
+  1330: model                 # Realme
+  1333: model                 # Sony Ericsson
+  1336: model                 # Tecno
+  1338: model                 # Vertu
+  1340: model                 # ZTE
+  3670: model                 # DOOGEE
+  3671: model                 # Nothing
+  3672: model                 # Redmi
+
+  # Цвет and Объем памяти are split Apple / everyone-else — collapsed too.
+  181:  color                 # Цвет — the Apple leaf only
+  105:  color                 # Цвет — every other brand
+  182:  storage               # Объем памяти — the Apple leaf only
+  224:  storage               # Объем памяти — every other brand
+
+  # Shared by every brand leaf. MULTI-SELECT values arrive comma-joined —
+  # split on ', ' before comparing (see the dataset guide).
+  29:   condition             # Состояние — Б/у | Новый
+  1168: technical_condition   # Техническое состояние — MULTI-SELECT
+  1182: device_class          # Класс — MULTI-SELECT (Флагман, Игровой, Камерофон…)
+  895:  ram                   # Оперативная память — carries its unit: '8 ГБ'
+  1178: sim                   # SIM-карты — MULTI-SELECT: '1 SIM, eSIM'
+  1170: package_contents      # Комплектация — MULTI-SELECT: 'Защитное стекло, Чехол'
+  1800: battery_health_pct    # Состояние аккумулятора, % — a bare number: '100'
+  3559: imei_status           # Регистрация IMEI — 'Зарегистрирован' / 'Не зарегистрирован'
+  1744: installment           # Рассрочка — 'В рассрочку' / 'Без рассрочки'
+  425:  delivery              # Доставка — MULTI-SELECT: 'Платная доставка, Самовывоз'
+
+# 32 leaf categories, biggest first (trailing number = ads at generation time).
+categories:
+  1361: {type: phone, deal: sale, brand: "Apple iPhone", name: "Apple iPhone"}                            # 3875
+  1369: {type: phone, deal: sale, brand: "Samsung", name: "Samsung"}                                      # 1280
+  8434: {type: phone, deal: sale, brand: "Redmi", name: "Redmi"}                                          # 1212
+  5956: {type: phone, deal: sale, brand: "Poco", name: "Poco"}                                            # 519
+  1395: {type: phone, deal: sale, brand: "Другие мобильные телефоны", name: "Другие мобильные телефоны"}  # 354
+  4439: {type: phone, deal: sale, brand: "Xiaomi", name: "Xiaomi"}                                        # 319
+  4734: {type: phone, deal: sale, brand: "Honor", name: "Honor"}                                          # 123
+  4442: {type: phone, deal: sale, brand: "Vivo", name: "Vivo"}                                            # 98
+  1366: {type: phone, deal: sale, brand: "Nokia", name: "Nokia"}                                          # 89
+  1383: {type: phone, deal: sale, brand: "Huawei", name: "Huawei"}                                        # 84
+  1381: {type: phone, deal: sale, brand: "Google", name: "Google"}                                        # 83
+  1393: {type: phone, deal: sale, brand: "Tecno", name: "Tecno"}                                          # 76
+  4747: {type: phone, deal: sale, brand: "OnePlus", name: "OnePlus"}                                      # 71
+  5293: {type: phone, deal: sale, brand: "Realme", name: "Realme"}                                        # 56
+  4441: {type: phone, deal: sale, brand: "Oppo", name: "Oppo"}                                            # 40
+  5954: {type: phone, deal: sale, brand: "Infinix", name: "Infinix"}                                      # 39
+  1394: {type: phone, deal: sale, brand: "ZTE", name: "ZTE"}                                              # 20
+  3182: {type: phone, deal: sale, brand: "Sony", name: "Sony"}                                            # 18
+  8435: {type: phone, deal: sale, brand: "Nothing", name: "Nothing"}                                      # 12
+  1365: {type: phone, deal: sale, brand: "Motorola", name: "Motorola"}                                    # 12
+  1376: {type: phone, deal: sale, brand: "Asus", name: "Asus"}                                            # 10
+  5955: {type: phone, deal: sale, brand: "Inoi", name: "Inoi"}                                            # 9
+  1385: {type: phone, deal: sale, brand: "Lenovo", name: "Lenovo"}                                        # 7
+  1364: {type: phone, deal: sale, brand: "LG", name: "LG"}                                                # 7
+  1371: {type: phone, deal: sale, brand: "Sony Ericsson", name: "Sony Ericsson"}                          # 6
+  1363: {type: phone, deal: sale, brand: "HTC", name: "HTC"}                                              # 5
+  4684: {type: phone, deal: sale, brand: "Vertu", name: "Vertu"}                                          # 5
+  1362: {type: phone, deal: sale, brand: "Ежевика", name: "Ежевика"}                                      # 4
+  8436: {type: phone, deal: sale, brand: "DOOGEE", name: "DOOGEE"}                                        # 2
+  3048: {type: phone, deal: sale, brand: "Fly", name: "Fly"}                                              # 2
+  1389: {type: phone, deal: sale, brand: "Philips", name: "Philips"}                                      # 2
+  4438: {type: phone, deal: sale, brand: "Meizu", name: "Meizu"}                                          # 1

@@ -215,7 +215,20 @@ class DatasetConfig:
     #: files.
     include_images: bool = True
     max_shard_size: str = "500MB"
+    #: Upload each image shard as soon as it is written and delete it locally,
+    #: instead of staging the whole set and uploading at the end.  Peak disk then
+    #: stays at roughly one shard rather than the full image corpus — the only way
+    #: to publish a set larger than the free space.  Requires ``hub.push``.
+    stream_upload: bool = False
     hub: HubConfig = field(default_factory=HubConfig)
+
+    def __post_init__(self) -> None:
+        if self.stream_upload and not self.hub.push:
+            raise ValueError(
+                "dataset.stream_upload requires dataset.hub.push — streaming deletes "
+                "each shard right after uploading it, so with push off the shards "
+                "would simply be destroyed"
+            )
 
 
 @dataclass(slots=True)

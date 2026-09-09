@@ -275,12 +275,33 @@ must pickle, and re-reading one small YAML per process is free.
 ### 5.8 `crawler/` — see §6 and §7.
 
 ### 5.9 `dataset/hf_builder.py`
-One Parquet subset per table + the embedded, sharded image subset (peak memory = one
-~500 MB shard, regardless of the ~tens of GB total — same streaming trick as
+One Parquet subset per table + the embedded, sharded image subset (peak *memory* =
+one ~500 MB shard, regardless of the ~tens of GB total — same streaming trick as
 house.kg's photo builder). Derived counts (`users.ads_count`,
 `complexes.listing_count`, `cities.listing_count`) are computed in one pass over the
 listings. Nested `params_raw` is JSON-encoded to a string so Arrow never has to infer
-a wobbly nested schema.
+a wobbly nested schema. An empty subset is skipped, so cars ship no `complexes`.
+
+**Shard planning.** `_shard_plan` splits the image rows into shards by accumulated
+*file size on disk*, read from the single `os.scandir` pass that also decides which
+rows have a file at all. Planning before writing is what lets a shard be named
+`images-<i>-of-<n>.parquet` on first write — the builder no longer stages under a
+temporary name and renames at the end.
+
+**Streaming upload** (`dataset.stream_upload`). Peak *disk* is the other constraint,
+and by default it is the whole corpus: every shard is written, then `upload_folder`
+sends the lot. With streaming, `_upload_shard` sends each shard and unlinks it right
+away, so peak disk is one shard. Consequences worth knowing before you touch this:
+
+* the repo must exist **before** the first shard, so `build()` calls `_open_repo()`
+  up front rather than leaving it to `_push`;
+* `_remote_files()` lists the repo once and shards already there are skipped, which
+  is what makes a 73 GB push resumable. This is only sound because shard *n* is
+  deterministic — same JSONL order, same size-based boundaries;
+* `_push` still runs at the end, but by then it is only carrying the card, the guide
+  and the tabular subsets;
+* streaming without `hub.push` would delete shards that were never sent, so
+  `DatasetConfig.__post_init__` rejects that combination at load time.
 
 ---
 
